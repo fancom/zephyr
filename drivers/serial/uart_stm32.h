@@ -69,6 +69,9 @@ struct uart_stm32_data {
 	uint8_t *rx_next_buffer;
 	size_t rx_next_buffer_len;
 #endif
+#ifdef CONFIG_PM_DEVICE
+	uint32_t pm_state;
+#endif
 };
 
 #define UART_STM32_DRV_CMD_SET_HW_FIFO_MODE		1
