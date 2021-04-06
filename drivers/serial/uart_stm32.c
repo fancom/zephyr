@@ -1257,6 +1257,10 @@ static int uart_stm32_async_init(const struct device *dev)
 static const struct uart_driver_api uart_stm32_driver_api = {
 	.poll_in = uart_stm32_poll_in,
 	.poll_out = uart_stm32_poll_out,
+#if defined(CONFIG_UART_9BITS_DATA_API)
+	.poll_in9 = NULL,
+	.poll_out9 = NULL,
+#endif	/* CONFIG_UART_9BITS_DATA_API */
 	.err_check = uart_stm32_err_check,
 	.configure = uart_stm32_configure,
 	.config_get = uart_stm32_config_get,

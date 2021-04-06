@@ -370,6 +370,13 @@ __subsystem struct uart_driver_api {
 	int (*poll_in)(const struct device *dev, unsigned char *p_char);
 	void (*poll_out)(const struct device *dev, unsigned char out_char);
 
+#if defined(CONFIG_UART_9BITS_DATA_API)
+
+	int (*poll_in9)(const struct device *dev, unsigned short *p_short);
+	void (*poll_out9)(const struct device *dev, unsigned short out_short);
+
+#endif
+
 	/** Console I/O function */
 	int (*err_check)(const struct device *dev);
 
@@ -819,6 +826,58 @@ static inline void z_impl_uart_poll_out(const struct device *dev,
 
 	api->poll_out(dev, out_char);
 }
+
+#if defined(CONFIG_UART_9BITS_DATA_API)
+
+/**
+ * @brief Poll the device for input.
+ *
+ * @param dev UART device structure.
+ * @param p_char Pointer to character.
+ *
+ * @retval 0 If a character arrived.
+ * @retval -1 If no character was available to read (i.e., the UART
+ *            input buffer was empty).
+ * @retval -ENOTSUP If the operation is not supported.
+ * @retval -EBUSY If reception was enabled using uart_rx_enabled
+ */
+__syscall int uart_poll_in9(const struct device *dev, unsigned short *p_short);
+
+static inline int z_impl_uart_poll_in9(const struct device *dev,
+				      unsigned short *p_short)
+{
+	const struct uart_driver_api *api =
+		(const struct uart_driver_api *)dev->api;
+
+	return api->poll_in9(dev, p_short);
+}
+
+/**
+ * @brief Output a character in polled mode.
+ *
+ * This routine checks if the transmitter is empty.
+ * When the transmitter is empty, it writes a character to the data
+ * register.
+ *
+ * To send a character when hardware flow control is enabled, the handshake
+ * signal CTS must be asserted.
+ *
+ * @param dev UART device structure.
+ * @param out_char Character to send.
+ */
+__syscall void uart_poll_out9(const struct device *dev,
+				      unsigned short out_short);
+
+static inline void z_impl_uart_poll_out9(const struct device *dev,
+						unsigned short out_short)
+{
+	const struct uart_driver_api *api =
+		(const struct uart_driver_api *)dev->api;
+
+	api->poll_out9(dev, out_short);
+}
+
+#endif /* CONFIG_UART_9BITS_DATA_API */
 
 /**
  * @brief Set UART configuration.
