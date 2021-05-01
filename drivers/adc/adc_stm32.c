@@ -30,7 +30,8 @@ LOG_MODULE_REGISTER(adc_stm32);
 
 #if !defined(CONFIG_SOC_SERIES_STM32F0X) && \
 	!defined(CONFIG_SOC_SERIES_STM32G0X) && \
-	!defined(CONFIG_SOC_SERIES_STM32L0X)
+	!defined(CONFIG_SOC_SERIES_STM32L0X) && \
+	!defined(CONFIG_SOC_SERIES_STM32WLX)
 #define RANK(n)		LL_ADC_REG_RANK_##n
 static const uint32_t table_rank[] = {
 	RANK(1),
@@ -150,7 +151,8 @@ static const uint32_t table_samp_time[] = {
 };
 #endif /* ADC5_V1_1 */
 #elif defined(CONFIG_SOC_SERIES_STM32L0X) || \
-	defined(CONFIG_SOC_SERIES_STM32G0X)
+	defined(CONFIG_SOC_SERIES_STM32G0X) || \
+	defined(CONFIG_SOC_SERIES_STM32WLX)
 static const uint16_t acq_time_tbl[8] = {2, 4, 8, 13, 20, 40, 80, 161};
 static const uint32_t table_samp_time[] = {
 	SMP_TIME(1,   _5),
@@ -267,7 +269,8 @@ static void adc_stm32_start_conversion(const struct device *dev)
 	defined(CONFIG_SOC_SERIES_STM32WBX) || \
 	defined(CONFIG_SOC_SERIES_STM32G0X) || \
 	defined(CONFIG_SOC_SERIES_STM32G4X) || \
-	defined(CONFIG_SOC_SERIES_STM32H7X)
+	defined(CONFIG_SOC_SERIES_STM32H7X) || \
+	defined(CONFIG_SOC_SERIES_STM32WLX)
 	LL_ADC_REG_StartConversion(adc);
 #else
 	LL_ADC_REG_StartConversionSWStart(adc);
@@ -354,7 +357,8 @@ static int start_read(const struct device *dev,
 #if defined(CONFIG_SOC_SERIES_STM32F0X) || \
 	defined(CONFIG_SOC_SERIES_STM32L0X)
 	LL_ADC_REG_SetSequencerChannels(adc, channel);
-#elif defined(CONFIG_SOC_SERIES_STM32G0X)
+#elif defined(CONFIG_SOC_SERIES_STM32G0X) || \
+	defined(CONFIG_SOC_SERIES_STM32WLX)
 	/* STM32G0 in "not fully configurable" sequencer mode */
 	LL_ADC_REG_SetSequencerChannels(adc, channel);
 	while (LL_ADC_IsActiveFlag_CCRDY(adc) == 0) {
@@ -395,7 +399,8 @@ static int start_read(const struct device *dev,
 	defined(CONFIG_SOC_SERIES_STM32WBX) || \
 	defined(CONFIG_SOC_SERIES_STM32G0X) || \
 	defined(CONFIG_SOC_SERIES_STM32G4X) || \
-	defined(CONFIG_SOC_SERIES_STM32H7X)
+	defined(CONFIG_SOC_SERIES_STM32H7X) || \
+	defined(CONFIG_SOC_SERIES_STM32WLX)
 	LL_ADC_EnableIT_EOC(adc);
 #elif defined(CONFIG_SOC_SERIES_STM32F1X)
 	LL_ADC_EnableIT_EOS(adc);
@@ -606,7 +611,8 @@ static void adc_stm32_calib(const struct device *dev)
 	LL_ADC_StartCalibration(adc, LL_ADC_SINGLE_ENDED);
 #elif defined(CONFIG_SOC_SERIES_STM32F0X) || \
 	defined(CONFIG_SOC_SERIES_STM32G0X) || \
-	defined(CONFIG_SOC_SERIES_STM32L0X)
+	defined(CONFIG_SOC_SERIES_STM32L0X) || \
+	defined(CONFIG_SOC_SERIES_STM32WLX)
 	LL_ADC_StartCalibration(adc);
 #elif defined(CONFIG_SOC_SERIES_STM32H7X)
 	LL_ADC_StartCalibration(adc, LL_ADC_CALIB_OFFSET, LL_ADC_SINGLE_ENDED);
@@ -674,13 +680,15 @@ static int adc_stm32_init(const struct device *dev)
 	defined(CONFIG_SOC_SERIES_STM32WBX) || \
 	defined(CONFIG_SOC_SERIES_STM32G0X) || \
 	defined(CONFIG_SOC_SERIES_STM32G4X) || \
-	defined(CONFIG_SOC_SERIES_STM32H7X)
+	defined(CONFIG_SOC_SERIES_STM32H7X) || \
+	defined(CONFIG_SOC_SERIES_STM32WLX)
 	LL_ADC_EnableInternalRegulator(adc);
 	k_busy_wait(LL_ADC_DELAY_INTERNAL_REGUL_STAB_US);
 #endif
 
 #if defined(CONFIG_SOC_SERIES_STM32F0X) || \
-	defined(CONFIG_SOC_SERIES_STM32L0X)
+	defined(CONFIG_SOC_SERIES_STM32L0X) || \
+	defined(CONFIG_SOC_SERIES_STM32WLX)
 	LL_ADC_SetClock(adc, LL_ADC_CLOCK_SYNC_PCLK_DIV4);
 #elif defined(CONFIG_SOC_SERIES_STM32F3X) || \
 	defined(CONFIG_SOC_SERIES_STM32L4X) || \
@@ -713,7 +721,8 @@ static int adc_stm32_init(const struct device *dev)
 	defined(CONFIG_SOC_SERIES_STM32WBX) || \
 	defined(CONFIG_SOC_SERIES_STM32G0X) || \
 	defined(CONFIG_SOC_SERIES_STM32G4X) || \
-	defined(CONFIG_SOC_SERIES_STM32H7X)
+	defined(CONFIG_SOC_SERIES_STM32H7X) || \
+	defined(CONFIG_SOC_SERIES_STM32WLX)
 	if (LL_ADC_IsActiveFlag_ADRDY(adc)) {
 		LL_ADC_ClearFlag_ADRDY(adc);
 	}
@@ -733,7 +742,8 @@ static int adc_stm32_init(const struct device *dev)
 	defined(CONFIG_SOC_SERIES_STM32WBX) || \
 	defined(CONFIG_SOC_SERIES_STM32G0X) || \
 	defined(CONFIG_SOC_SERIES_STM32G4X) || \
-	defined(CONFIG_SOC_SERIES_STM32H7X)
+	defined(CONFIG_SOC_SERIES_STM32H7X) || \
+	defined(CONFIG_SOC_SERIES_STM32WLX)
 	/*
 	 * ADC modules on these series have to wait for some cycles to be
 	 * enabled.
@@ -758,7 +768,8 @@ static int adc_stm32_init(const struct device *dev)
 	defined(CONFIG_SOC_SERIES_STM32WBX) || \
 	defined(CONFIG_SOC_SERIES_STM32G0X) || \
 	defined(CONFIG_SOC_SERIES_STM32G4X) || \
-	defined(CONFIG_SOC_SERIES_STM32H7X)
+	defined(CONFIG_SOC_SERIES_STM32H7X) || \
+	defined(CONFIG_SOC_SERIES_STM32WLX)
 	/*
 	 * Enabling ADC modules in L4, WB, G0 and G4 series may fail if they are
 	 * still not stabilized, this will wait for a short time to ensure ADC
