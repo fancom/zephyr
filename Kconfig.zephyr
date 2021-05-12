@@ -187,7 +187,7 @@ menu "Compiler Options"
 config ZEPHYR_SYSTEM_INTERFACE
 	bool "Configure Zephyr include paths as system headers"
 	help
-	  Compiler will not show warnings coming from Zephir headers if this
+	  Marks Zephyrs include paths as system headers. Preventing warnings during compilation of a user application in case stricter warning levels are configured.
 	  option is set.
 
 config CODING_GUIDELINE_CHECK
