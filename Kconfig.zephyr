@@ -184,6 +184,16 @@ endmenu
 
 menu "Compiler Options"
 
+config ZEPHYR_SYSTEM_INTERFACE
+	bool "Configure Zephyr include paths as system headers"
+	default n
+	help
+	  Marks Zephyr's include paths as system headers, preventing warnings
+	  during compilation of a user application in case stricter warning levels
+	  are configured.
+
+	  If unsure, leave at the default value n.
+
 config CODING_GUIDELINE_CHECK
 	bool "Enforce coding guideline rules"
 	help
