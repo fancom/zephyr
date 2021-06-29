@@ -6,10 +6,9 @@
 
 menuconfig NET_DSA
 	bool "Distributed Switch Architecture support"
-	depends on ETH_MCUX
+	depends on NET_L2_ETHERNET
 	help
-	  Enable Distributed Switch Architecture support. For now it
-	  only supports Kinetics ENET driver.
+	  Enable Distributed Switch Architecture support.
 
 if NET_DSA
 
