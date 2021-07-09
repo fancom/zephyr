@@ -86,6 +86,8 @@ config UART_9BITS_DATA_API
 
 comment "Serial Drivers"
 
+source "drivers/serial/Kconfig.b91"
+
 source "drivers/serial/Kconfig.ns16550"
 
 source "drivers/serial/Kconfig.mcux"
