@@ -334,14 +334,21 @@ static int start_read(const struct device *dev,
 	data->buffer = sequence->buffer;
 
 	uint32_t channel = __LL_ADC_DECIMAL_NB_TO_CHANNEL(index);
+
 #if defined(CONFIG_SOC_SERIES_STM32H7X)
 	/*
 	 * Each channel in the sequence must be previously enabled in PCSEL.
 	 * This register controls the analog switch integrated in the IO level.
 	 * NOTE: There is no LL API to control this register yet.
 	 */
+#if defined(ADC_VER_V5_V90)
+	if (ADCx != ADC3) {
+		adc->PCSEL_RES0 |= channels & ADC_PCSEL_PCSEL_Msk;
+	}
+#else
 	adc->PCSEL |= channels & ADC_PCSEL_PCSEL_Msk;
-#endif
+#endif /* ADC_VER_V5_V90 */
+#endif /* CONFIG_SOC_SERIES_STM32H7X */
 
 #if defined(CONFIG_SOC_SERIES_STM32F0X) || \
 	defined(CONFIG_SOC_SERIES_STM32L0X)
