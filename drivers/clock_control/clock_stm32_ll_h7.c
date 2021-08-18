@@ -471,7 +471,7 @@ static struct clock_control_driver_api stm32_clock_control_api = {
 	.get_rate = stm32_clock_control_get_subsys_rate,
 };
 
-static int stm32_clock_control_init(const struct device *dev)
+static int clock_control_init(const struct device *dev)
 {
 
 #if !defined(CONFIG_CPU_CORTEX_M4)
@@ -729,7 +729,7 @@ static int stm32_clock_control_init(const struct device *dev)
  * that the device init runs just after SOC init
  */
 DEVICE_DT_DEFINE(DT_NODELABEL(rcc),
-		    &stm32_clock_control_init,
+		    &clock_control_init,
 		    NULL,
 		    NULL, NULL,
 		    PRE_KERNEL_1,
