@@ -21,6 +21,8 @@ manifest:
   remotes:
     - name: upstream
       url-base: https://github.com/zephyrproject-rtos
+    - name: optima
+      url-base: https://github.com/fancom
 
   #
   # Please add items below based on alphabetical order
@@ -94,7 +96,9 @@ manifest:
       revision: 24d84ecff195fb15c889d9046e44e4804d626c67
       path: modules/crypto/mbedtls
     - name: mcuboot
-      revision: 3fc59410b633a6d83bbb534e43aac43160f9bd32
+      repo-path: mcuboot
+      remote: optima
+      revision: 3fa1d27026bda64e18fd6524afb68d699a36c595
       path: bootloader/mcuboot
     - name: mcumgr
       revision: 43845e883ff3a6cdaae22e23f3e60b5fcf78c6ba

@@ -65,9 +65,17 @@ extern "C" {
 #define BOOT_IMG_VER_STRLEN_MAX 25  /* 255.255.65535.4294967295\0 */
 
 /* Trailer: */
-#define BOOT_MAX_ALIGN		8
+#ifdef CONFIG_FLASH_ALIGNMENT_WORD_SIZE_BYTES
+#define BOOT_MAX_ALIGN          CONFIG_FLASH_ALIGNMENT_WORD_SIZE_BYTES
+#else
+#define BOOT_MAX_ALIGN          8
+#endif
 #ifndef BOOT_MAGIC_SZ
+#ifdef CONFIG_FLASH_ALIGNMENT_WORD_SIZE_BYTES
+#define BOOT_MAGIC_SZ		CONFIG_FLASH_ALIGNMENT_WORD_SIZE_BYTES
+#else
 #define BOOT_MAGIC_SZ		16
+#endif
 #endif
 
 #define BOOT_TRAILER_IMG_STATUS_OFFS(bank_area) ((bank_area)->fa_size -\

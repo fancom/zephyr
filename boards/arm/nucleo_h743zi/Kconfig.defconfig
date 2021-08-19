@@ -15,4 +15,11 @@ config NET_L2_ETHERNET
 
 endif # NETWORKING
 
+# flash alignment
+config FLASH_ALIGNMENT_WORD_SIZE_BYTES
+	int "Size of the flash word"
+	default 8
+	help
+	  Sets the alignment size of a flash word.
+
 endif # BOARD_NUCLEO_H743ZI
