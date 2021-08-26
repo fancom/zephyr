@@ -15,6 +15,7 @@
 #include <sys/util.h>
 #include <drivers/clock_control/stm32_clock_control.h>
 #include "stm32_hsem.h"
+#include "clock_stm32_ll_common.h"
 
 /* Macros to fill up prescaler values */
 #define z_hsi_divider(v) LL_RCC_HSI_DIV ## v
@@ -37,6 +38,12 @@
 
 #define z_apb4_prescaler(v) LL_RCC_APB4_DIV_ ## v
 #define apb4_prescaler(v) z_apb4_prescaler(v)
+
+#define z_mco1_prescaler(v) LL_RCC_MCO1_DIV_ ## v
+#define mco1_prescaler(v) z_mco1_prescaler(v)
+
+#define z_mco2_prescaler(v) LL_RCC_MCO2_DIV_ ## v
+#define mco2_prescaler(v) z_mco2_prescaler(v)
 
 /* Macro to check for clock feasability */
 /* It is Cortex M7's responsibility to setup clock tree */
@@ -720,6 +727,16 @@ static int clock_control_init(const struct device *dev)
 	SysTick_Config(CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC / 1000);
 	/* Update CMSIS variable */
 	SystemCoreClock = CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC;
+
+#ifndef CONFIG_CLOCK_STM32_MCO1_SRC_NOCLOCK
+	LL_RCC_ConfigMCO(MCO1_SOURCE,
+			 mco1_prescaler(CONFIG_CLOCK_STM32_MCO1_DIV));
+#endif /* CONFIG_CLOCK_STM32_MCO1_SRC_NOCLOCK */
+
+#ifndef CONFIG_CLOCK_STM32_MCO2_SRC_NOCLOCK
+	LL_RCC_ConfigMCO(MCO2_SOURCE,
+			 mco2_prescaler(CONFIG_CLOCK_STM32_MCO2_DIV));
+#endif /* CONFIG_CLOCK_STM32_MCO2_SRC_NOCLOCK */
 
 	return 0;
 }

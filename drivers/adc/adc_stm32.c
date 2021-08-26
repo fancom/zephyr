@@ -342,7 +342,8 @@ static int start_read(const struct device *dev,
 	 * NOTE: There is no LL API to control this register yet.
 	 */
 #if defined(ADC_VER_V5_V90)
-	if (ADCx != ADC3) {
+	/* ADC3 has no preselection register */
+	if (adc != ADC3) {
 		adc->PCSEL_RES0 |= channels & ADC_PCSEL_PCSEL_Msk;
 	}
 #else
