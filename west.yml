@@ -98,7 +98,7 @@ manifest:
     - name: mcuboot
       repo-path: mcuboot
       remote: optima
-      revision: 3fa1d27026bda64e18fd6524afb68d699a36c595
+      revision: fd65511e48f971b8f47d137901e3c9f420b763bc
       path: bootloader/mcuboot
     - name: mcumgr
       revision: 43845e883ff3a6cdaae22e23f3e60b5fcf78c6ba
