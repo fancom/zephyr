@@ -456,7 +456,7 @@ config NET_TCP_WORKQ_STACK_SIZE
 
 config NET_TCP_ISN_RFC6528
 	bool "Use ISN algorithm from RFC 6528"
-	default y
+	default n
 	depends on NET_TCP
 	select MBEDTLS
 	select MBEDTLS_MD
