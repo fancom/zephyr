@@ -1188,59 +1188,6 @@ static int uart_stm32_async_tx9(const struct device *dev,
 	return 0;
 }
 
-#if defined(CONFIG_UART_9BITS_DATA_API)
-
-static int uart_stm32_async_tx9(const struct device *dev,
-		const uint16_t *tx_data, size_t buf_size, int32_t timeout)
-{
-	struct uart_stm32_data *data = DEV_DATA(dev);
-	USART_TypeDef *UartInstance = UART_STRUCT(dev);
-	int ret;
-
-	if (data->dma_tx.dma_dev == NULL) {
-		return -ENODEV;
-	}
-
-	if (data->dma_tx.buffer_length != 0) {
-		return -EBUSY;
-	}
-
-	data->dma_tx.buffer = (uint16_t *)tx_data;
-	data->dma_tx.buffer_length = buf_size;
-	data->dma_tx.timeout = timeout;
-	data->dma_tx.src_addr_increment = sizeof(uint16_t);
-
-	LOG_DBG("tx: l=%d", data->dma_tx.buffer_length);
-
-	/* disable TX interrupt since DMA will handle it */
-	LL_USART_DisableIT_TC(UartInstance);
-
-	/* set source address */
-	data->dma_tx.blk_cfg.source_address = (uint32_t)data->dma_tx.buffer;
-	data->dma_tx.blk_cfg.block_size = data->dma_tx.buffer_length;
-
-	ret = dma_config(data->dma_tx.dma_dev, data->dma_tx.dma_channel,
-				&data->dma_tx.dma_cfg);
-
-	if (ret != 0) {
-		LOG_ERR("dma tx config error!");
-		return -EINVAL;
-	}
-
-	if (dma_start(data->dma_tx.dma_dev, data->dma_tx.dma_channel)) {
-		LOG_ERR("UART err: TX DMA start failed!");
-		return -EFAULT;
-	}
-
-	/* Start TX timer */
-	async_timer_start(&data->dma_tx.timeout_work, data->dma_tx.timeout);
-
-	/* Enable TX DMA requests */
-	uart_stm32_dma_tx_enable(dev);
-
-	return 0;
-}
-
 #endif /* CONFIG_UART_9BITS_DATA_API */
 
 static int uart_stm32_async_rx_enable(const struct device *dev,
@@ -1264,69 +1211,6 @@ static int uart_stm32_async_rx_enable(const struct device *dev,
 	data->dma_rx.buffer_length = buf_size;
 	data->dma_rx.counter = 0;
 	data->dma_rx.timeout = timeout;
-
-	/* Disable RX interrupts to let DMA to handle it */
-	LL_USART_DisableIT_RXNE(UartInstance);
-
-	data->dma_rx.blk_cfg.block_size = buf_size;
-	data->dma_rx.blk_cfg.dest_address = (uint32_t)data->dma_rx.buffer;
-
-	ret = dma_config(data->dma_rx.dma_dev, data->dma_rx.dma_channel,
-				&data->dma_rx.dma_cfg);
-
-	if (ret != 0) {
-		LOG_ERR("UART ERR: RX DMA config failed!");
-		return -EINVAL;
-	}
-
-	if (dma_start(data->dma_rx.dma_dev, data->dma_rx.dma_channel)) {
-		LOG_ERR("UART ERR: RX DMA start failed!");
-		return -EFAULT;
-	}
-
-	/* Enable RX DMA requests */
-	uart_stm32_dma_rx_enable(dev);
-
-	/* Enable IRQ IDLE to define the end of a
-	 * RX DMA transaction.
-	 */
-	LL_USART_ClearFlag_IDLE(UartInstance);
-	LL_USART_EnableIT_IDLE(UartInstance);
-
-	LL_USART_EnableIT_ERROR(UartInstance);
-
-	/* Request next buffer */
-	async_evt_rx_buf_request(data);
-
-	LOG_DBG("async rx enabled");
-
-	return ret;
-}
-
-#if defined(CONFIG_UART_9BITS_DATA_API)
-
-static int uart_stm32_async_rx_enable9(const struct device *dev,
-		uint16_t *rx_buf, size_t buf_size, int32_t timeout)
-{
-	struct uart_stm32_data *data = DEV_DATA(dev);
-	USART_TypeDef *UartInstance = UART_STRUCT(dev);
-	int ret;
-
-	if (data->dma_rx.dma_dev == NULL) {
-		return -ENODEV;
-	}
-
-	if (data->dma_rx.enabled) {
-		LOG_WRN("RX was already enabled");
-		return -EBUSY;
-	}
-
-	data->dma_rx.offset = 0;
-	data->dma_rx.buffer = rx_buf;
-	data->dma_rx.buffer_length = buf_size;
-	data->dma_rx.counter = 0;
-	data->dma_rx.timeout = timeout;
-	data->dma_tx.dst_addr_increment = sizeof(uint16_t);
 
 	/* Disable RX interrupts to let DMA to handle it */
 	LL_USART_DisableIT_RXNE(UartInstance);
