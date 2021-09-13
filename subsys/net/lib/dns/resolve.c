@@ -411,9 +411,9 @@ static inline void invoke_query_callback(int status,
 					 struct dns_pending_query *pending_query)
 {
 	/* Only notify if the slot is neither released nor in the process of
-	 * being released.
+	 * being released and callback is not null.
 	 */
-	if (pending_query->query != NULL)  {
+	if (pending_query->query != NULL && pending_query->cb != NULL)  {
 		pending_query->cb(status, info, pending_query->user_data);
 	}
 }
