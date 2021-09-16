@@ -422,51 +422,47 @@ static int start_read(const struct device *dev,
 	defined(CONFIG_SOC_SERIES_STM32L4X) || \
 	defined(CONFIG_SOC_SERIES_STM32WBX) || \
 	defined(CONFIG_SOC_SERIES_STM32WLX)
-	switch (sequence->oversampling) {
-	case 0:
+
+static const uint32_t table_oversampling_shift[] = {
+	0,
+	LL_ADC_OVS_SHIFT_RIGHT_1,
+	LL_ADC_OVS_SHIFT_RIGHT_2,
+	LL_ADC_OVS_SHIFT_RIGHT_3,
+	LL_ADC_OVS_SHIFT_RIGHT_4,
+	LL_ADC_OVS_SHIFT_RIGHT_5,
+	LL_ADC_OVS_SHIFT_RIGHT_6,
+	LL_ADC_OVS_SHIFT_RIGHT_7,
+	LL_ADC_OVS_SHIFT_RIGHT_8,
+};
+
+	uint32_t oversampling_ratio = sequence->oversampling;
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+	/* All H7 devices' ADC1+2 is 10bit */
+	if (adc != ADC3) {
+		oversampling_ratio = 1<<sequence->oversampling;
+	}
+#endif
+	if (sequence->oversampling == 0) {
 		LL_ADC_SetOverSamplingScope(adc, LL_ADC_OVS_DISABLE);
-		break;
-	case 1:
+	} else if (sequence->oversampling <= 8) {
 		LL_ADC_SetOverSamplingScope(adc, LL_ADC_OVS_GRP_REGULAR_CONTINUED);
-		LL_ADC_ConfigOverSamplingRatioShift(adc, LL_ADC_OVS_RATIO_2,
-						    LL_ADC_OVS_SHIFT_RIGHT_1);
-		break;
-	case 2:
-		LL_ADC_SetOverSamplingScope(adc, LL_ADC_OVS_GRP_REGULAR_CONTINUED);
-		LL_ADC_ConfigOverSamplingRatioShift(adc, LL_ADC_OVS_RATIO_4,
-						    LL_ADC_OVS_SHIFT_RIGHT_2);
-		break;
-	case 3:
-		LL_ADC_SetOverSamplingScope(adc, LL_ADC_OVS_GRP_REGULAR_CONTINUED);
-		LL_ADC_ConfigOverSamplingRatioShift(adc, LL_ADC_OVS_RATIO_8,
-						    LL_ADC_OVS_SHIFT_RIGHT_3);
-		break;
-	case 4:
-		LL_ADC_SetOverSamplingScope(adc, LL_ADC_OVS_GRP_REGULAR_CONTINUED);
-		LL_ADC_ConfigOverSamplingRatioShift(adc, LL_ADC_OVS_RATIO_16,
-						    LL_ADC_OVS_SHIFT_RIGHT_4);
-		break;
-	case 5:
-		LL_ADC_SetOverSamplingScope(adc, LL_ADC_OVS_GRP_REGULAR_CONTINUED);
-		LL_ADC_ConfigOverSamplingRatioShift(adc, LL_ADC_OVS_RATIO_32,
-						    LL_ADC_OVS_SHIFT_RIGHT_5);
-		break;
-	case 6:
-		LL_ADC_SetOverSamplingScope(adc, LL_ADC_OVS_GRP_REGULAR_CONTINUED);
-		LL_ADC_ConfigOverSamplingRatioShift(adc, LL_ADC_OVS_RATIO_64,
-						    LL_ADC_OVS_SHIFT_RIGHT_6);
-		break;
-	case 7:
-		LL_ADC_SetOverSamplingScope(adc, LL_ADC_OVS_GRP_REGULAR_CONTINUED);
-		LL_ADC_ConfigOverSamplingRatioShift(adc, LL_ADC_OVS_RATIO_128,
-						    LL_ADC_OVS_SHIFT_RIGHT_7);
-		break;
-	case 8:
-		LL_ADC_SetOverSamplingScope(adc, LL_ADC_OVS_GRP_REGULAR_CONTINUED);
-		LL_ADC_ConfigOverSamplingRatioShift(adc, LL_ADC_OVS_RATIO_256,
-						    LL_ADC_OVS_SHIFT_RIGHT_8);
-		break;
-	default:
+#if defined(CONFIG_SOC_SERIES_STM32H7X) && defined(ADC_VER_V5_V90)
+		/* Set bits manually to circumvent bug in LL Libraries
+		 * https://github.com/STMicroelectronics/STM32CubeH7/issues/177
+		 */
+		if (adc == ADC3) {
+			MODIFY_REG(adc->CFGR2, ADC_CFGR2_OVSS,
+				table_oversampling_shift[sequence->oversampling]);
+			MODIFY_REG(adc->CFGR2, ADC3_CFGR2_OVSR,
+				(oversampling_ratio - 1UL) << ADC3_CFGR2_OVSR_Pos);
+		} else {
+#endif
+			LL_ADC_ConfigOverSamplingRatioShift(adc, oversampling_ratio,
+				table_oversampling_shift[sequence->oversampling]);
+#if defined(CONFIG_SOC_SERIES_STM32H7X) && defined(ADC_VER_V5_V90)
+		}
+#endif
+	} else {
 		LOG_ERR("Invalid oversampling");
 		return -EINVAL;
 	}
