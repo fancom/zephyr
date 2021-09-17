@@ -367,17 +367,9 @@ static int start_read(const struct device *dev,
 	/*
 	 * Each channel in the sequence must be previously enabled in PCSEL.
 	 * This register controls the analog switch integrated in the IO level.
-	 * NOTE: There is no LL API to control this register yet.
 	 */
-#if defined(ADC_VER_V5_V90)
-	/* ADC3 has no preselection register */
-	if (adc != ADC3) {
-		adc->PCSEL_RES0 |= channels & ADC_PCSEL_PCSEL_Msk;
-	}
-#else
-	adc->PCSEL |= channels & ADC_PCSEL_PCSEL_Msk;
-#endif /* ADC_VER_V5_V90 */
-#endif /* CONFIG_SOC_SERIES_STM32H7X */
+	LL_ADC_SetChannelPreSelection(adc, channel);
+#endif
 
 #if defined(CONFIG_SOC_SERIES_STM32F0X) || \
 	defined(CONFIG_SOC_SERIES_STM32L0X)
