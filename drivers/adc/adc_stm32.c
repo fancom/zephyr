@@ -274,6 +274,34 @@ static void adc_stm32_start_conversion(const struct device *dev)
 #endif
 }
 
+#if !defined(CONFIG_SOC_SERIES_STM32F2X) && \
+	!defined(CONFIG_SOC_SERIES_STM32F4X) && \
+	!defined(CONFIG_SOC_SERIES_STM32F7X) && \
+	!defined(CONFIG_SOC_SERIES_STM32F1X) && \
+	!defined(CONFIG_SOC_SERIES_STM32L1X)
+static void adc_stm32_calib(const struct device *dev)
+{
+	const struct adc_stm32_cfg *config =
+		(const struct adc_stm32_cfg *)dev->config;
+	ADC_TypeDef *adc = config->base;
+
+#if defined(CONFIG_SOC_SERIES_STM32F3X) || \
+	defined(CONFIG_SOC_SERIES_STM32L4X) || \
+	defined(CONFIG_SOC_SERIES_STM32WBX) || \
+	defined(CONFIG_SOC_SERIES_STM32G4X)
+	LL_ADC_StartCalibration(adc, LL_ADC_SINGLE_ENDED);
+#elif defined(CONFIG_SOC_SERIES_STM32F0X) || \
+	defined(CONFIG_SOC_SERIES_STM32G0X) || \
+	defined(CONFIG_SOC_SERIES_STM32L0X)
+	LL_ADC_StartCalibration(adc);
+#elif defined(CONFIG_SOC_SERIES_STM32H7X)
+	LL_ADC_StartCalibration(adc, LL_ADC_CALIB_OFFSET, LL_ADC_SINGLE_ENDED);
+#endif
+	while (LL_ADC_IsCalibrationOnGoing(adc)) {
+	}
+}
+#endif
+
 static int start_read(const struct device *dev,
 		      const struct adc_sequence *sequence)
 {
@@ -387,6 +415,78 @@ static int start_read(const struct device *dev,
 #elif !defined(CONFIG_SOC_SERIES_STM32F1X)
 	LL_ADC_SetResolution(adc, resolution);
 #endif
+
+#if defined(CONFIG_SOC_SERIES_STM32G0X) || \
+	defined(CONFIG_SOC_SERIES_STM32G4X) || \
+	defined(CONFIG_SOC_SERIES_STM32H7X) || \
+	defined(CONFIG_SOC_SERIES_STM32L0X) || \
+	defined(CONFIG_SOC_SERIES_STM32L4X) || \
+	defined(CONFIG_SOC_SERIES_STM32WBX) || \
+	defined(CONFIG_SOC_SERIES_STM32WLX)
+
+static const uint32_t table_oversampling_shift[] = {
+	0,
+	LL_ADC_OVS_SHIFT_RIGHT_1,
+	LL_ADC_OVS_SHIFT_RIGHT_2,
+	LL_ADC_OVS_SHIFT_RIGHT_3,
+	LL_ADC_OVS_SHIFT_RIGHT_4,
+	LL_ADC_OVS_SHIFT_RIGHT_5,
+	LL_ADC_OVS_SHIFT_RIGHT_6,
+	LL_ADC_OVS_SHIFT_RIGHT_7,
+	LL_ADC_OVS_SHIFT_RIGHT_8,
+};
+
+	uint32_t oversampling_ratio = sequence->oversampling;
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+	/* All H7 devices' ADC1+2 is 10bit */
+	if (adc != ADC3) {
+		oversampling_ratio = 1<<sequence->oversampling;
+	}
+#endif
+	if (sequence->oversampling == 0) {
+		LL_ADC_SetOverSamplingScope(adc, LL_ADC_OVS_DISABLE);
+	} else if (sequence->oversampling <= 8) {
+		LL_ADC_SetOverSamplingScope(adc, LL_ADC_OVS_GRP_REGULAR_CONTINUED);
+#if defined(CONFIG_SOC_SERIES_STM32H7X) && defined(ADC_VER_V5_V90)
+		/* Set bits manually to circumvent bug in LL Libraries
+		 * https://github.com/STMicroelectronics/STM32CubeH7/issues/177
+		 */
+		if (adc == ADC3) {
+			MODIFY_REG(adc->CFGR2, ADC_CFGR2_OVSS,
+				table_oversampling_shift[sequence->oversampling]);
+			MODIFY_REG(adc->CFGR2, ADC3_CFGR2_OVSR,
+				(oversampling_ratio - 1UL) << ADC3_CFGR2_OVSR_Pos);
+		} else {
+#endif
+			LL_ADC_ConfigOverSamplingRatioShift(adc, oversampling_ratio,
+				table_oversampling_shift[sequence->oversampling]);
+#if defined(CONFIG_SOC_SERIES_STM32H7X) && defined(ADC_VER_V5_V90)
+		}
+#endif
+	} else {
+		LOG_ERR("Invalid oversampling");
+		return -EINVAL;
+	}
+#else
+	if (sequence->oversampling) {
+		LOG_ERR("Oversampling not supported");
+		return -ENOTSUP;
+	}
+#endif
+
+	if (sequence->calibrate) {
+#if !defined(CONFIG_SOC_SERIES_STM32F2X) && \
+	!defined(CONFIG_SOC_SERIES_STM32F4X) && \
+	!defined(CONFIG_SOC_SERIES_STM32F7X) && \
+	!defined(CONFIG_SOC_SERIES_STM32F1X) && \
+	!defined(STM32F3X_ADC_V2_5) && \
+	!defined(CONFIG_SOC_SERIES_STM32L1X)
+		adc_stm32_calib(dev);
+#else
+		LOG_ERR("Calibration not supported");
+		return -ENOTSUP;
+#endif
+	}
 
 #if defined(CONFIG_SOC_SERIES_STM32F0X) || \
 	defined(CONFIG_SOC_SERIES_STM32F3X) || \
@@ -587,34 +687,6 @@ static int adc_stm32_channel_setup(const struct device *dev,
 
 	return 0;
 }
-
-#if !defined(CONFIG_SOC_SERIES_STM32F2X) && \
-	!defined(CONFIG_SOC_SERIES_STM32F4X) && \
-	!defined(CONFIG_SOC_SERIES_STM32F7X) && \
-	!defined(CONFIG_SOC_SERIES_STM32F1X) && \
-	!defined(CONFIG_SOC_SERIES_STM32L1X)
-static void adc_stm32_calib(const struct device *dev)
-{
-	const struct adc_stm32_cfg *config =
-		(const struct adc_stm32_cfg *)dev->config;
-	ADC_TypeDef *adc = config->base;
-
-#if defined(CONFIG_SOC_SERIES_STM32F3X) || \
-	defined(CONFIG_SOC_SERIES_STM32L4X) || \
-	defined(CONFIG_SOC_SERIES_STM32WBX) || \
-	defined(CONFIG_SOC_SERIES_STM32G4X)
-	LL_ADC_StartCalibration(adc, LL_ADC_SINGLE_ENDED);
-#elif defined(CONFIG_SOC_SERIES_STM32F0X) || \
-	defined(CONFIG_SOC_SERIES_STM32G0X) || \
-	defined(CONFIG_SOC_SERIES_STM32L0X)
-	LL_ADC_StartCalibration(adc);
-#elif defined(CONFIG_SOC_SERIES_STM32H7X)
-	LL_ADC_StartCalibration(adc, LL_ADC_CALIB_OFFSET, LL_ADC_SINGLE_ENDED);
-#endif
-	while (LL_ADC_IsCalibrationOnGoing(adc)) {
-	}
-}
-#endif
 
 static int adc_stm32_init(const struct device *dev)
 {
