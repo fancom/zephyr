@@ -2,24 +2,32 @@
 # SPDX-License-Identifier: Apache-2.0
 
 description: |
-    STM32 QSPI Flash controller supporting the JEDEC CFI interface.
+    STM32 OSPI Flash controller supporting the JEDEC CFI interface by
+    mimicking a QSPI controller.
 
-    Representation of a serial flash on a quadspi bus:
+    Representation of a serial flash on a octospi bus:
 
-        mx25r6435f: qspi-nor-flash@0 {
-                compatible = "st,stm32-qspi-nor";
-                label = "MX25R6435F";
-                reg = <0>;
-                qspi-max-frequency = <80000000>;
-                size = <0x4000000>;
-                status = "okay";
-        };
+      &octospi1 {
+        pinctrl-0 = <
+              &octospi_clk_pb2
+              &octospi_ncs_pg6
+              &octospi_bk1_io0_pd11
+              &octospi_bk1_io1_pc10
+              &octospi_bk1_io2_pe2
+              &octospi_bk1_io3_pd13
+          >;
 
-compatible: "st,stm32-qspi-nor"
+          status = "okay";
+          clock-port = <1>;
+          ncs-port = <1>;
+          io-low-port = <0x10001>;
+      }
+
+compatible: "st,stm32-qspi-nor-ospi"
 
 include: ["flash-controller.yaml", "jedec,jesd216.yaml"]
 
-on-bus: qspi
+on-bus: ospi
 
 properties:
     reg:

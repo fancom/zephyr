@@ -1,0 +1,104 @@
+# Copyright (c) 2020, Nobleo Technology
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+    STM32 OSPI device representation. A stm32 octospi node would typically
+    looks to this:
+
+      &octospi1 {
+        pinctrl-0 = <
+          &octospi_clk_pb2
+          &octospi_ncs_pg6
+          &octospi_bk1_io0_pd11
+          &octospi_bk1_io1_pc10
+          &octospi_bk1_io2_pe2
+          &octospi_bk1_io3_pd13
+        >;
+
+        status = "okay";
+        clock-port = <1>;
+        ncs-port = <1>;
+        io-low-port = <1>;
+      }
+
+compatible: "st,stm32-ospi"
+
+include: base.yaml
+
+bus: ospi
+
+properties:
+    reg:
+      required: true
+
+    interrupts:
+      required: true
+
+    dmas:
+      description: |
+        Optional DMA channel specifier. If DMA should be used, specifier should
+        hold a phandle reference to the dma controller, the channel number,
+        the slot number, channel configuration and finally features.
+
+        For example dmas for TX/RX on QSPI
+           dmas = <&dma1 5 5 0x0000 0x03>;
+
+    dma-names:
+      description: |
+        DMA channel name. If DMA should be used, expected value is "tx_rx".
+
+        For example
+           dma-names = "tx_rx";
+
+    pinctrl-0:
+      type: phandles
+      required: true
+
+    chip-select-boundary:
+      type: int
+      default: 0
+      description: |
+        It enables the transaction boundary feature and
+        defines the boundary of bytes to release the chip select.
+        This parameter can be a value between 0 and 31.
+
+    clock-port:
+      type: int
+      required: true
+      description : |
+        It indicates which port of the OSPI IO Manager is used for the CLK pins.
+        This parameter can be a value between 1 and 8
+
+    ncs-port:
+      type: int
+      required: true
+      description: |
+        It indicates which port of the OSPI IO Manager is used for the NCS pin.
+        This parameter can be a value between 1 and 8
+
+    dqs-port:
+      type: int
+      default: 0
+      description: |
+        It indicates which port of the OSPI IO Manager is used for the DQS pin.
+        This parameter can be a value between 0 and 8, 0 means that signal not used
+
+    io-low-port:
+      type: int
+      default: 0
+      description: |
+        It indicates which port of the OSPI IO Manager is used for the IO[3:0] pins.
+
+    io-high-port:
+      type: int
+      default: 0
+      description: |
+        It indicates which port of the OSPI IO Manager is used for the IO[7:4] pins.
+
+    req-2-ack-time:
+      type: int
+      default: 1
+      description: |
+        It indicates the minimum switching duration (in number of clock cycles) expected
+        if some signals are multiplexed in the OSPI IO Manager with the other OSPI.
+        This parameter can be a value between 1 and 256
