@@ -8,17 +8,18 @@
 #define ZEPHYR_INCLUDE_MGMT_BUF_H_
 
 #include <inttypes.h>
-#include "tinycbor/cbor.h"
-#include "tinycbor/cbor_buf_writer.h"
+#include "cbor.h"
+
 struct net_buf;
 
 struct cbor_nb_reader {
-	struct cbor_decoder_reader r;
+	CborParser parser;//must be first in the struct due to pointer casts to surrounding struct
+	CborValue it;
 	struct net_buf *nb;
 };
 
 struct cbor_nb_writer {
-	struct cbor_encoder_writer enc;
+	CborEncoder encoder;//must be first in the struct due to pointer casts to surrounding struct
 	struct net_buf *nb;
 };
 
