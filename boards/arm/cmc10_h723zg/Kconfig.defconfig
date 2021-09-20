@@ -1,0 +1,20 @@
+if BOARD_CMC10_H723ZG
+
+config BOARD
+	default "cmc10_h723zg"
+
+if NETWORKING
+
+config NET_L2_ETHERNET
+	default y
+
+endif # NETWORKING
+
+# flash alignment (TODO Move to MCUMGR driver)
+config FLASH_ALIGNMENT_WORD_SIZE_BYTES
+	int "Size of the flash word"
+	default 8
+	help
+	  Sets the alignment size of a flash word.
+
+endif # BOARD_CMC10_H723ZG

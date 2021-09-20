@@ -1,0 +1,3 @@
+config BOARD_CMC10_H723ZG
+	bool "CMC10 Process Controller"
+	depends on SOC_STM32H723XX
