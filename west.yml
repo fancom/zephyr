@@ -95,10 +95,12 @@ manifest:
     - name: mcuboot
       repo-path: mcuboot
       remote: optima
-      revision: fd65511e48f971b8f47d137901e3c9f420b763bc
+      revision: bb55d1c7878c9dd6f80ffc76c235913706e4c442
       path: bootloader/mcuboot
     - name: mcumgr
-      revision: 5c5055f5a7565f8152d75fcecf07262928b4d56e
+      repo-path: mynewt-mcumgr
+      remote: optima
+      revision: b4bae0056c6c4df0735cb1961a864d5000cb4f95
       path: modules/lib/mcumgr
     - name: net-tools
       revision: f49bd1354616fae4093bf36e5eaee43c51a55127
@@ -123,7 +125,9 @@ manifest:
       path: modules/audio/sof
     - name: tinycbor
       path: modules/lib/tinycbor
-      revision: 40daca97b478989884bffb5226e9ab73ca54b8c4
+      repo-path: tinycbor
+      remote: optima
+      revision: 69e745dd9d4975a770ca70195f61510b43e125d4
     - name: tinycrypt
       path: modules/crypto/tinycrypt
       revision: 3e9a49d2672ec01435ffbf0d788db6d95ef28de0
