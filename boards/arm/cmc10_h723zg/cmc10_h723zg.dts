@@ -9,9 +9,10 @@
     chosen {
         zephyr,dtcm = &dtcm;
 		zephyr,sram = &sram0;
-		
+
         zephyr,flash = &flash0;
         zephyr,code-partition = &slot0_partition;
+        zephyr,flash-controller = &is25lq040b;
 
         zephyr,console = &usart1;
 		zephyr,shell-uart = &usart1;
@@ -89,7 +90,7 @@
         cm4_reset: cm4_reset {
             label = "CM4 Reset";
             gpios = <&gpiof 1 GPIO_ACTIVE_HIGH>;
-        };        
+        };
         debug: debug {
             label = "debug";
             gpios = <&gpioa 11 GPIO_ACTIVE_HIGH>;
@@ -111,7 +112,7 @@
             label = "led_blue";
             gpios = <&gpioc 15 (GPIO_ACTIVE_LOW | GPIO_OPEN_DRAIN)>;
         };
-        
+
         display_dcx: display_dcx {
             label = "display_dcx";
             gpios = <&gpiod 0 GPIO_ACTIVE_HIGH>;
@@ -159,32 +160,32 @@
             gpios = <&gpiog 1 GPIO_ACTIVE_LOW>;
         };
     };
-    
+
     soc {
 		pinctrl: pin-controller@58020000 {
-            quadspi_clk_pb2: quadspi_clk_pb2 {
+            octospi_clk_pb2: octospi_clk_pb2 {
 				pinmux = <STM32_PINMUX('B', 2, AF9)>;   // P1
 				slew-rate = "very-high-speed";
 			};
-            quadspi_ncs_pg6: quadspi_ncs_pg6 {
+            octospi_ncs_pg6: octospi_ncs_pg6 {
 				pinmux = <STM32_PINMUX('G', 6, AF10)>;  // P1
-				bias-pull-up;
+				slew-rate = "very-high-speed";
 			};
-            quadspi_bk1_io0_pd11: quadspi_bk1_io0_pd11 {
+            octospi_bk1_io0_pd11: octospi_bk1_io0_pd11 {
 				pinmux = <STM32_PINMUX('D', 11, AF9)>;  // P1
-				bias-pull-down;
+                slew-rate = "very-high-speed";
 			};
-            quadspi_bk1_io1_pc10: quadspi_bk1_io1_c10 {
+            octospi_bk1_io1_pc10: quadspi_bk1_io1_c10 {
 				pinmux = <STM32_PINMUX('C', 10, AF9)>;  // P1
-				bias-pull-down;
+                slew-rate = "very-high-speed";
 			};
-            quadspi_bk1_io2_pe2: quadspi_bk1_io2_pe2 {
+            octospi_bk1_io2_pe2: octospi_bk1_io2_pe2 {
 				pinmux = <STM32_PINMUX('E', 2, AF9)>;   // P1
-				bias-pull-down;
+                slew-rate = "very-high-speed";
 			};
-            quadspi_bk1_io3_pd13: quadspi_bk1_io3_pd13 {
+            octospi_bk1_io3_pd13: octospi_bk1_io3_pd13 {
 				pinmux = <STM32_PINMUX('D', 13, AF9)>;  // P1
-				bias-pull-down;
+                slew-rate = "very-high-speed";
 			};
 
             mco1_pa8: mco1_pa8 {
@@ -192,6 +193,18 @@
 				slew-rate = "very-high-speed";
 			};
         };
+
+        octospi1: octospi@52005000 {
+            compatible = "st,stm32-ospi";
+			label = "OCTOSPI_1";
+			#address-cells = <0x1>;
+			#size-cells = <0x0>;
+			reg = <0x52005000 0x1000>;
+			interrupts = <92 0>;
+            /* Clocks for OCTOSPI1 and OCTOSPI I/O Manager */
+			clocks = <&rcc STM32_CLOCK_BUS_AHB3 ((1<<21) | (1<<14))>;
+			status = "disabled";
+		};
     };
 
     pwm_out {
@@ -203,29 +216,6 @@
 			label = "watchdog_out";
 		};
 	};
-
-    qspi1: quadspi@5200B400{
-        compatible = "st,stm32-qspi";
-        reg = <0x5200B400 DT_SIZE_K(1024)>;
-        label = "QSPI";
-        pinctrl-0 = <
-            &quadspi_clk_pb2
-            &quadspi_ncs_pg6
-            &quadspi_bk1_io0_pd11
-            &quadspi_bk1_io1_pc10
-            &quadspi_bk1_io2_pe2
-            &quadspi_bk1_io3_pd13
-        >;
-
-        // Note: DMA needs to be configured
-        dmas = <&dma1 5 5 0x0000 0x03>;        
-        dma-names = "tx_rx";
-        
-        interrupt-parent = <&nvic>;
-        interrupts = <92 0>;
-
-        status = "okay";
-    };
 
 	aliases {
 		wdg-feedback = &wdg_feedback;
@@ -346,12 +336,10 @@
 
 	pwm_2: pwm {
 		status = "okay";
-		st,prescaler = <0>;
+		st,prescaler = <10000>;
 		pinctrl-0 = <
             /* Aout 5 */
             &tim2_ch1_pa15
-            /* Display Backlight */
-            &tim2_ch3_pb10
         >;
 	};
 };
@@ -368,6 +356,20 @@
 	};
 };
 
+&timers2 {
+	status = "okay";
+
+	pwm_2: pwm {
+		status = "okay";
+		st,prescaler = <1000>;
+		pinctrl-0 = <
+            /* Display Backlight */
+            &tim2_ch3_pb10
+        >;
+	};
+};
+
+
 &spi1{
     compatible = "st,stm32-spi";
     status = "okay";
@@ -382,8 +384,8 @@
     ili9341@0 {
         compatible = "ilitek,ili9341";
         label = "ILI9341";
-        /* Minimum of 10MHz. 
-         * Increasing to 20MHz seems to 
+        /* Minimum of 10MHz.
+         * Increasing to 20MHz seems to
          * result in unreliable communication.
          * Could possibly increase speed with
          * in-depth analysis of unreliable
@@ -402,7 +404,7 @@
     pinctrl-0 = <
          &spi4_miso_pe5
          &spi4_mosi_pe6
-    >;    
+    >;
 };
 
 &spi6{
@@ -420,7 +422,7 @@
 
 &mac {
     status = "okay";
-    pinctrl-0 = < 
+    pinctrl-0 = <
         &eth_mdc_pc1
         &eth_rxd0_pc4
         &eth_rxd1_pc5
@@ -434,46 +436,97 @@
     >;
 };
 
+/* The AXI RAM can be extended to
+ * to utilize the entire 320kB (0x5000)
+ * of space. This space is shared by
+ * ITCM and AXI, so it can be used
+ * ONLY IF ITCM is not explicitly
+ * used/defined.
+ */
+ &sram0{
+    reg = <0x24000000 DT_SIZE_K(320)>;
+    compatible = "mmio-sram";
+};
+
+&iwdg1{
+	status = "okay";
+};
+
 &flash0 {
     partitions {
  		compatible = "fixed-partitions";
  		#address-cells = <1>;
  		#size-cells = <1>;
- 
-		/* 48KB for bootloader */
+
+		/* 64KB for bootloader */
  		boot_partition: partition@0 {
  			label = "mcuboot";
-			reg = <0x00000000 0x0000C000>;
+            reg = <0x00000000 DT_SIZE_K(64)>;
  			read-only;
  		};
- 
+
 		/* storage: 4KB for settings */
 		/*
 		 * The flash starting at 0x0000c000 and ending at
 		 * 0x0000cfff is reserved for use
 		 * by the application.
 		 */
-        storage_partition: partition@C000 {
+        storage_partition: partition@10000 {
             label = "storage";
-            reg = <0x0000C000 0x00001000>;
+            reg = <0x000010000 0x00001000>;
         };
 
-        /* 
-         * Remaining size: 896kB
-         * beware, when flashing the application,
-         * openocd erases sector wise. As the H7 sector size is 128kB,
-         * we need to start the application image slot at 128kB offset,
-         * to prevent the boot_partition to be erased
-         */
-        /* application image slot: 448KB */
+        /* application image slot: 512KB */
         slot0_partition: partition@20000 {
             label = "image-0";
-            reg = <0x00020000 0x00070000>;
+            reg = <0x00020000 DT_SIZE_K(512)>;
         };
-        
-        slot1_partition: partition@90000 {
-            label = "image-1";
-            reg = <0x00090000 0x00070000>;
+
+        /* Scratch slot */
+		scratch_partition: partition@A0000 {
+			label = "image-scratch";
+            reg = <0x000A0000 DT_SIZE_K(128)>;
         };
  	};
+};
+
+&octospi1 {
+	pinctrl-0 = <
+        &octospi_clk_pb2
+        &octospi_ncs_pg6
+        &octospi_bk1_io0_pd11
+        &octospi_bk1_io1_pc10
+        &octospi_bk1_io2_pe2
+        &octospi_bk1_io3_pd13
+    >;
+
+    status = "okay";
+    clock-port = <1>;
+    ncs-port = <1>;
+    io-low-port = <0x10001>;
+
+	is25lq040b: qspi-nor-flash@0 {
+		compatible = "st,stm32-qspi-nor-ospi";
+		label = "IS25LQ040B";
+		reg = <0>;
+        /* Higher frequencies untested */
+		qspi-max-frequency = <80000000>;
+        /* Flash size in bits */
+		size = <(DT_SIZE_K(512)*8)>;
+        use-four-datalines;
+
+        status = "okay";
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+            /* application image slot: 512KB */
+			slot1_partition: partition@0 {
+				label = "image-1";
+				reg = <0x00000000 DT_SIZE_K(512)>;
+            };
+		};
+	};
 };
