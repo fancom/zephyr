@@ -20,3 +20,21 @@ config FLASH_STM32_QSPI
 	select USE_STM32_HAL_DMA if $(DT_STM32_QUADSPI_HAS_DMA)
 	help
 	  Enable QSPI-NOR support on the STM32 family of processors.
+
+DT_COMPAT_ST_STM32_OSPI_NOR := st,stm32-qspi-nor-ospi
+DT_STM32_OCTOSPI_HAS_DMA := $(dt_node_has_prop,octospi,dmas)
+
+config FLASH_STM32_OSPI_MIMIC_QSPI
+	bool "STM32 Quad SPI Flash driver by using OSPI Module"
+	depends on SOC_FAMILY_STM32
+	default $(dt_compat_enabled,$(DT_COMPAT_ST_STM32_OSPI_NOR))
+	select USE_STM32_HAL_OSPI
+	select USE_STM32_HAL_MDMA
+	select FLASH_HAS_DRIVER_ENABLED
+	select FLASH_JESD216
+	select FLASH_PAGE_LAYOUT
+	select FLASH_HAS_PAGE_LAYOUT
+	select DMA if $(DT_STM32_OCTOSPI_HAS_DMA)
+	select USE_STM32_HAL_DMA if $(DT_STM32_OCTOSPI_HAS_DMA)
+	help
+	  Enable QSPI-NOR using OSPI support on the STM32 family of processors.

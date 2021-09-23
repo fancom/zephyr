@@ -5,8 +5,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define DT_DRV_COMPAT st_stm32_qspi_nor
-
 #include <errno.h>
 #include <kernel.h>
 #include <toolchain.h>
@@ -31,10 +29,62 @@ LOG_MODULE_REGISTER(flash_stm32_qspi, CONFIG_FLASH_LOG_LEVEL);
 
 #define STM32_QSPI_FIFO_THRESHOLD         8
 #define STM32_QSPI_CLOCK_PRESCALER_MAX  255
+#define STM32_QSPI_CLOCK_PRESCALER_MAX  255
 
+#if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_qspi_nor) \
+	|| DT_HAS_COMPAT_STATUS_OKAY(st_stm32_qspi_nor_ospi)
+
+#ifdef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
+	/* Mimic QSPI using OCTOSPI if QUADSPI
+	 * is not available
+	 */
+#define DT_DRV_COMPAT st_stm32_qspi_nor_ospi
+
+/* SPI Specific functions and variables */
+#define HAL_QSPI_TYPEDEF				OCTOSPI_TypeDef
+#define HAL_QSPI_HANDLETYPEDEF			OSPI_HandleTypeDef
+#define HAL_QSPI_COMMAND				OSPI_RegularCmdTypeDef
+#define HAL_QSPI_SEND_COMMAND_IT		HAL_OSPI_Command_IT
+#define HAL_QSPI_RECEIVE_DMA			HAL_OSPI_Receive_DMA
+#define HAL_QSPI_TRANSMIT_DMA			HAL_OSPI_Transmit_DMA
+#define HAL_QSPI_RECEIVE_IT				HAL_OSPI_Receive_IT
+#define HAL_QSPI_TRANSMIT_IT			HAL_OSPI_Transmit_IT
+#define HAL_QSPI_IRQHANDLER				HAL_OSPI_IRQHandler
+#define HAL_QSPI_ERRORCALLBACK			HAL_OSPI_ErrorCallback
+#define HAL_QSPI_CMDCPLTCALLBACK		HAL_OSPI_CmdCpltCallback
+#define HAL_QSPI_RXCPLTCALLBACK			HAL_OSPI_RxCpltCallback
+#define HAL_QSPI_TXCPLTCALLBACK			HAL_OSPI_TxCpltCallback
+#define HAL_OSPI_STATUSMATCHCALLBACK	HAL_OSPI_StatusMatchCallback
+#define HAL_OSPI_TIMEOUTCALLBACK		HAL_OSPI_TimeOutCallback
+
+/* OSPI uses HAL_OSPI_Command with timeout */
+#define STM32_OSPI_SPI_CMD_TIMEOUT_TICKS 100
+
+#else
+#define DT_DRV_COMPAT st_stm32_qspi_nor
+
+/* SPI Specific functions and variables */
+#define HAL_QSPI_TYPEDEF				QUADSPI_TypeDef
+#define HAL_QSPI_HANDLETYPEDEF			QSPI_HandleTypeDef
+#define HAL_QSPI_COMMAND				QSPI_CommandTypeDef
+#define HAL_QSPI_SEND_COMMAND_IT		HAL_QSPI_Command_IT
+#define HAL_QSPI_RECEIVE_DMA			HAL_QSPI_Receive_DMA
+#define HAL_QSPI_TRANSMIT_DMA			HAL_QSPI_Transmit_DMA
+#define HAL_QSPI_RECEIVE_IT				HAL_QSPI_Receive_IT
+#define HAL_QSPI_TRANSMIT_IT			HAL_QSPI_Transmit_IT
+#define HAL_QSPI_IRQHANDLER				HAL_QSPI_IRQHandler
+#define HAL_QSPI_ERRORCALLBACK			HAL_QSPI_ErrorCallback
+#define HAL_QSPI_CMDCPLTCALLBACK		HAL_QSPI_CmdCpltCallback
+#define HAL_QSPI_RXCPLTCALLBACK			HAL_QSPI_RxCpltCallback
+#define HAL_QSPI_TXCPLTCALLBACK			HAL_QSPI_TxCpltCallback
+#define HAL_OSPI_STATUSMATCHCALLBACK	HAL_QSPI_StatusMatchCallback
+#define HAL_OSPI_TIMEOUTCALLBACK		HAL_QSPI_TimeOutCallback
+
+#endif
+
+#define STM32_QSPI_NODE DT_PARENT(DT_DRV_INST(0))
 #define STM32_QSPI_USE_DMA DT_NODE_HAS_PROP(DT_PARENT(DT_DRV_INST(0)), dmas)
-
-#if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_qspi_nor)
+#define STM32_QSPI_USE_FOUR_DATALINES DT_INST_PROP(0, use_four_datalines)
 
 uint32_t table_m_size[] = {
 	LL_DMA_MDATAALIGN_BYTE,
@@ -59,7 +109,7 @@ struct stream {
 };
 
 struct flash_stm32_qspi_config {
-	QUADSPI_TypeDef *regs;
+	HAL_QSPI_TYPEDEF *regs;
 	struct stm32_pclken pclken;
 	irq_config_func_t irq_config;
 	size_t flash_size;
@@ -69,7 +119,7 @@ struct flash_stm32_qspi_config {
 };
 
 struct flash_stm32_qspi_data {
-	QSPI_HandleTypeDef hqspi;
+	HAL_QSPI_HANDLETYPEDEF hqspi;
 	struct k_sem sem;
 	struct k_sem sync;
 #if defined(CONFIG_FLASH_PAGE_LAYOUT)
@@ -105,7 +155,7 @@ static inline void qspi_unlock_thread(const struct device *dev)
 /*
  * Send a command over QSPI bus.
  */
-static int qspi_send_cmd(const struct device *dev, QSPI_CommandTypeDef *cmd)
+static int qspi_send_cmd(const struct device *dev, HAL_QSPI_COMMAND *cmd)
 {
 	const struct flash_stm32_qspi_config *dev_cfg = DEV_CFG(dev);
 	struct flash_stm32_qspi_data *dev_data = DEV_DATA(dev);
@@ -117,7 +167,7 @@ static int qspi_send_cmd(const struct device *dev, QSPI_CommandTypeDef *cmd)
 
 	dev_data->cmd_status = 0;
 
-	hal_ret = HAL_QSPI_Command_IT(&dev_data->hqspi, cmd);
+	hal_ret = HAL_QSPI_SEND_COMMAND_IT(&dev_data->hqspi, cmd);
 	if (hal_ret != HAL_OK) {
 		LOG_ERR("%d: Failed to send QSPI instruction", hal_ret);
 		return -EIO;
@@ -132,7 +182,7 @@ static int qspi_send_cmd(const struct device *dev, QSPI_CommandTypeDef *cmd)
 /*
  * Perform a read access over QSPI bus.
  */
-static int qspi_read_access(const struct device *dev, QSPI_CommandTypeDef *cmd,
+static int qspi_read_access(const struct device *dev, HAL_QSPI_COMMAND *cmd,
 			    uint8_t *data, size_t size)
 {
 	const struct flash_stm32_qspi_config *dev_cfg = DEV_CFG(dev);
@@ -145,16 +195,21 @@ static int qspi_read_access(const struct device *dev, QSPI_CommandTypeDef *cmd,
 
 	dev_data->cmd_status = 0;
 
+#ifndef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
 	hal_ret = HAL_QSPI_Command_IT(&dev_data->hqspi, cmd);
+#else
+	/* The HAL interrupt driven command does not support sending/receiving data */
+	hal_ret = HAL_OSPI_Command(&dev_data->hqspi, cmd, STM32_OSPI_SPI_CMD_TIMEOUT_TICKS);
+#endif
 	if (hal_ret != HAL_OK) {
 		LOG_ERR("%d: Failed to send QSPI instruction", hal_ret);
 		return -EIO;
 	}
 
 #if STM32_QSPI_USE_DMA
-	hal_ret = HAL_QSPI_Receive_DMA(&dev_data->hqspi, data);
+	hal_ret = HAL_QSPI_RECEIVE_DMA(&dev_data->hqspi, data);
 #else
-	hal_ret = HAL_QSPI_Receive_IT(&dev_data->hqspi, data);
+	hal_ret = HAL_QSPI_RECEIVE_IT(&dev_data->hqspi, data);
 #endif
 	if (hal_ret != HAL_OK) {
 		LOG_ERR("%d: Failed to read data", hal_ret);
@@ -169,7 +224,7 @@ static int qspi_read_access(const struct device *dev, QSPI_CommandTypeDef *cmd,
 /*
  * Perform a write access over QSPI bus.
  */
-static int qspi_write_access(const struct device *dev, QSPI_CommandTypeDef *cmd,
+static int qspi_write_access(const struct device *dev, HAL_QSPI_COMMAND *cmd,
 			     const uint8_t *data, size_t size)
 {
 	const struct flash_stm32_qspi_config *dev_cfg = DEV_CFG(dev);
@@ -184,16 +239,21 @@ static int qspi_write_access(const struct device *dev, QSPI_CommandTypeDef *cmd,
 
 	dev_data->cmd_status = 0;
 
+#ifndef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
 	hal_ret = HAL_QSPI_Command_IT(&dev_data->hqspi, cmd);
+#else
+	/* The HAL interrupt driven command does not support sending/receiving data */
+	hal_ret = HAL_OSPI_Command(&dev_data->hqspi, cmd, STM32_OSPI_SPI_CMD_TIMEOUT_TICKS);
+#endif
 	if (hal_ret != HAL_OK) {
 		LOG_ERR("%d: Failed to send QSPI instruction", hal_ret);
 		return -EIO;
 	}
 
 #if STM32_QSPI_USE_DMA
-	hal_ret = HAL_QSPI_Transmit_DMA(&dev_data->hqspi, (uint8_t *)data);
+	hal_ret = HAL_QSPI_TRANSMIT_DMA(&dev_data->hqspi, (uint8_t *)data);
 #else
-	hal_ret = HAL_QSPI_Transmit_IT(&dev_data->hqspi, (uint8_t *)data);
+	hal_ret = HAL_OSPI_Transmit_IT(&dev_data->hqspi, (uint8_t *)data);
 #endif
 	if (hal_ret != HAL_OK) {
 		LOG_ERR("%d: Failed to read data", hal_ret);
@@ -206,23 +266,123 @@ static int qspi_write_access(const struct device *dev, QSPI_CommandTypeDef *cmd,
 	return dev_data->cmd_status;
 }
 
+static int qspi_write_enable(const struct device *dev)
+{
+#ifndef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
+	QSPI_CommandTypeDef cmd_write_en = {
+		.Instruction = SPI_NOR_CMD_WREN,
+		.InstructionMode = QSPI_INSTRUCTION_1_LINE,
+	};
+#else
+	OSPI_RegularCmdTypeDef cmd_write_en = {
+		.Instruction = SPI_NOR_CMD_WREN,
+		.InstructionMode = HAL_OSPI_INSTRUCTION_1_LINE,
+	};
+#endif
+
+	return qspi_send_cmd(dev, &cmd_write_en);
+}
+
+static int qspi_read_status(const struct device *dev, uint8_t *status)
+{
+#ifndef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
+	QSPI_CommandTypeDef cmd = {
+		.Instruction = SPI_NOR_CMD_RDSR,
+		.InstructionMode = QSPI_INSTRUCTION_1_LINE,
+		.DataMode = QSPI_DATA_1_LINE,
+	};
+#else
+	OSPI_RegularCmdTypeDef cmd = {
+		.Instruction = SPI_NOR_CMD_RDSR,
+		.InstructionMode = HAL_OSPI_INSTRUCTION_1_LINE,
+		.DataMode = HAL_OSPI_DATA_1_LINE,
+	};
+#endif
+
+	return qspi_read_access(dev, &cmd, status, 1);
+}
+
+static int qspi_write_status(const struct device *dev, uint8_t status)
+{
+	int ret;
+
+#ifndef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
+	QSPI_CommandTypeDef cmd = {
+		.Instruction = SPI_NOR_CMD_WRSR,
+		.InstructionMode = QSPI_INSTRUCTION_1_LINE,
+		.DataMode = QSPI_DATA_1_LINE,
+	};
+#else
+	OSPI_RegularCmdTypeDef cmd = {
+		.Instruction = SPI_NOR_CMD_WRSR,
+		.InstructionMode = HAL_OSPI_INSTRUCTION_1_LINE,
+		.DataMode = HAL_OSPI_DATA_1_LINE,
+	};
+#endif
+
+	ret = qspi_write_enable(dev);
+	if (ret < 0) {
+		LOG_ERR("Could not WREN to write status");
+		return ret;
+	}
+
+	return qspi_write_access(dev, &cmd, &status, 1);
+}
+
 /*
  * Read Serial Flash Discovery Parameter
  */
 static int qspi_read_sfdp(const struct device *dev, off_t addr, uint8_t *data,
 			  size_t size)
 {
+#ifndef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
 	QSPI_CommandTypeDef cmd = {
 		.Instruction = JESD216_CMD_READ_SFDP,
 		.Address = addr,
 		.AddressSize = QSPI_ADDRESS_24_BITS,
-		.DummyCycles = 8,
+		.DummyCycles = SPI_NOR_DUMMY_BYTE,
 		.InstructionMode = QSPI_INSTRUCTION_1_LINE,
 		.AddressMode = QSPI_ADDRESS_1_LINE,
 		.DataMode = QSPI_DATA_1_LINE,
 	};
+#else
+	OSPI_RegularCmdTypeDef cmd = {
+		.Instruction = JESD216_CMD_READ_SFDP,
+		.Address = addr,
+		.AddressSize = HAL_OSPI_ADDRESS_24_BITS,
+		.DummyCycles = SPI_NOR_DUMMY_BYTE,
+		.InstructionMode = HAL_OSPI_INSTRUCTION_1_LINE,
+		.AddressMode = HAL_OSPI_ADDRESS_1_LINE,
+		.DataMode = HAL_OSPI_DATA_1_LINE,
+	};
+#endif
 
 	return qspi_read_access(dev, &cmd, data, size);
+}
+
+static int qspi_quad_output_set(const struct device *dev, bool enable)
+{
+	/* To use four data lines in flash communication
+	 * it needs to be enabled first by setting the QE bit
+	 * in the status register.
+	 */
+
+	int ret;
+	uint8_t status;
+
+	ret = qspi_read_status(dev, &status);
+	if (ret < 0) {
+		LOG_ERR("Could not read status to set QE bit");
+		return ret;
+	}
+
+	if (enable) {
+		status |= SPI_NOR_QE_BIT;
+	} else {
+		status &= ~SPI_NOR_QE_BIT;
+	}
+
+	return qspi_write_status(dev, status);
 }
 
 static bool qspi_address_is_valid(const struct device *dev, off_t addr,
@@ -240,19 +400,50 @@ static int flash_stm32_qspi_read(const struct device *dev, off_t addr,
 	int ret;
 
 	if (!qspi_address_is_valid(dev, addr, size)) {
-		LOG_DBG("Error: address or size exceeds expected values: "
+		LOG_ERR("address or size exceeds expected values: "
 			"addr 0x%lx, size %zu", (long)addr, size);
 		return -EINVAL;
 	}
 
+#ifndef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
 	QSPI_CommandTypeDef cmd = {
+#if STM32_QSPI_USE_FOUR_DATALINES
+		.Instruction = SPI_NOR_CMD_FRQO,
+		.Address = addr,
+		.AddressSize = QSPI_ADDRESS_24_BITS,
+		.InstructionMode = QSPI_INSTRUCTION_1_LINE,
+		.AddressMode = QSPI_ADDRESS_1_LINE,
+		.DataMode = QSPI_DATA_4_LINES,
+		.DummyCycles = SPI_NOR_DUMMY_BYTE,
+#else
 		.Instruction = SPI_NOR_CMD_READ,
 		.Address = addr,
 		.AddressSize = QSPI_ADDRESS_24_BITS,
 		.InstructionMode = QSPI_INSTRUCTION_1_LINE,
 		.AddressMode = QSPI_ADDRESS_1_LINE,
 		.DataMode = QSPI_DATA_1_LINE,
+#endif
 	};
+#else
+	OSPI_RegularCmdTypeDef cmd = {
+#if STM32_QSPI_USE_FOUR_DATALINES
+		.Instruction = SPI_NOR_CMD_FRQO,
+		.Address = addr,
+		.AddressSize = HAL_OSPI_ADDRESS_24_BITS,
+		.InstructionMode = HAL_OSPI_INSTRUCTION_1_LINE,
+		.AddressMode = HAL_OSPI_ADDRESS_1_LINE,
+		.DataMode = HAL_OSPI_DATA_4_LINES,
+		.DummyCycles = SPI_NOR_DUMMY_BYTE,
+#else
+		.Instruction = SPI_NOR_CMD_READ,
+		.Address = addr,
+		.AddressSize = HAL_OSPI_ADDRESS_24_BITS,
+		.InstructionMode = HAL_OSPI_INSTRUCTION_1_LINE,
+		.AddressMode = HAL_OSPI_ADDRESS_1_LINE,
+		.DataMode = HAL_OSPI_DATA_1_LINE,
+#endif
+	};
+#endif
 
 	qspi_lock_thread(dev);
 
@@ -265,18 +456,12 @@ static int flash_stm32_qspi_read(const struct device *dev, off_t addr,
 
 static int qspi_wait_until_ready(const struct device *dev)
 {
-	uint8_t reg;
 	int ret;
-
-	QSPI_CommandTypeDef cmd = {
-		.Instruction = SPI_NOR_CMD_RDSR,
-		.InstructionMode = QSPI_INSTRUCTION_1_LINE,
-		.DataMode = QSPI_DATA_1_LINE,
-	};
+	uint8_t status;
 
 	do {
-		ret = qspi_read_access(dev, &cmd, &reg, sizeof(reg));
-	} while (!ret && (reg & SPI_NOR_WIP_BIT));
+		ret = qspi_read_status(dev, &status);
+	} while (!ret && (status & SPI_NOR_WIP_BIT));
 
 	return ret;
 }
@@ -292,11 +477,16 @@ static int flash_stm32_qspi_write(const struct device *dev, off_t addr,
 		return -EINVAL;
 	}
 
-	QSPI_CommandTypeDef cmd_write_en = {
-		.Instruction = SPI_NOR_CMD_WREN,
+#ifndef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
+#if STM32_QSPI_USE_FOUR_DATALINES
+	QSPI_CommandTypeDef cmd_pp = {
+		.Instruction = SPI_NOR_CMD_PPQ,
+		.AddressSize = QSPI_ADDRESS_24_BITS,
 		.InstructionMode = QSPI_INSTRUCTION_1_LINE,
+		.AddressMode = QSPI_ADDRESS_1_LINE,
+		.DataMode = QSPI_DATA_4_LINES,
 	};
-
+#else
 	QSPI_CommandTypeDef cmd_pp = {
 		.Instruction = SPI_NOR_CMD_PP,
 		.AddressSize = QSPI_ADDRESS_24_BITS,
@@ -304,6 +494,26 @@ static int flash_stm32_qspi_write(const struct device *dev, off_t addr,
 		.AddressMode = QSPI_ADDRESS_1_LINE,
 		.DataMode = QSPI_DATA_1_LINE,
 	};
+#endif
+#else
+#if STM32_QSPI_USE_FOUR_DATALINES
+	OSPI_RegularCmdTypeDef cmd_pp = {
+		.Instruction = SPI_NOR_CMD_PPQ,
+		.AddressSize = HAL_OSPI_ADDRESS_24_BITS,
+		.InstructionMode = HAL_OSPI_INSTRUCTION_1_LINE,
+		.AddressMode = HAL_OSPI_ADDRESS_1_LINE,
+		.DataMode = HAL_OSPI_DATA_4_LINES,
+	};
+#else
+	OSPI_RegularCmdTypeDef cmd_pp = {
+		.Instruction = SPI_NOR_CMD_PP,
+		.AddressSize = HAL_OSPI_ADDRESS_24_BITS,
+		.InstructionMode = HAL_OSPI_INSTRUCTION_1_LINE,
+		.AddressMode = HAL_OSPI_ADDRESS_1_LINE,
+		.DataMode = HAL_OSPI_DATA_1_LINE,
+	};
+#endif
+#endif
 
 	qspi_lock_thread(dev);
 
@@ -322,14 +532,16 @@ static int flash_stm32_qspi_write(const struct device *dev, off_t addr,
 						(addr % SPI_NOR_PAGE_SIZE);
 		}
 
-		ret = qspi_send_cmd(dev, &cmd_write_en);
+		ret = qspi_write_enable(dev);
 		if (ret != 0) {
+			LOG_ERR("Write Enable failed");
 			break;
 		}
 
 		cmd_pp.Address = addr;
 		ret = qspi_write_access(dev, &cmd_pp, data, to_write);
 		if (ret != 0) {
+			LOG_ERR("Write Data failed");
 			break;
 		}
 
@@ -339,6 +551,7 @@ static int flash_stm32_qspi_write(const struct device *dev, off_t addr,
 
 		ret = qspi_wait_until_ready(dev);
 		if (ret != 0) {
+			LOG_ERR("Wait until ready failed");
 			break;
 		}
 	}
@@ -361,28 +574,36 @@ static int flash_stm32_qspi_erase(const struct device *dev, off_t addr,
 		return -EINVAL;
 	}
 
-	QSPI_CommandTypeDef cmd_write_en = {
-		.Instruction = SPI_NOR_CMD_WREN,
-		.InstructionMode = QSPI_INSTRUCTION_1_LINE,
-	};
-
+#ifndef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
 	QSPI_CommandTypeDef cmd_erase = {
 		.Instruction = 0,
 		.AddressSize = QSPI_ADDRESS_24_BITS,
 		.InstructionMode = QSPI_INSTRUCTION_1_LINE,
 		.AddressMode = QSPI_ADDRESS_1_LINE,
 	};
+#else
+	OSPI_RegularCmdTypeDef cmd_erase = {
+		.Instruction = 0,
+		.AddressSize = HAL_OSPI_ADDRESS_24_BITS,
+		.InstructionMode = HAL_OSPI_INSTRUCTION_1_LINE,
+		.AddressMode = HAL_OSPI_ADDRESS_1_LINE,
+	};
+#endif
 
 	qspi_lock_thread(dev);
 
 	while ((size > 0) && (ret == 0)) {
 		cmd_erase.Address = addr;
-		qspi_send_cmd(dev, &cmd_write_en);
+		ret = qspi_write_enable(dev);
 
 		if (size == dev_cfg->flash_size) {
 			/* chip erase */
 			cmd_erase.Instruction = SPI_NOR_CMD_CE;
+#ifndef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
 			cmd_erase.AddressMode = QSPI_ADDRESS_NONE;
+#else
+			cmd_erase.AddressMode = HAL_OSPI_ADDRESS_NONE;
+#endif
 			qspi_send_cmd(dev, &cmd_erase);
 			size -= dev_cfg->flash_size;
 		} else {
@@ -394,7 +615,6 @@ static int flash_stm32_qspi_erase(const struct device *dev, off_t addr,
 				ei < JESD216_NUM_ERASE_TYPES; ++ei) {
 				const struct jesd216_erase_type *etp =
 							&erase_types[ei];
-
 				if ((etp->exp != 0)
 				    && SPI_NOR_IS_ALIGNED(addr, etp->exp)
 				    && SPI_NOR_IS_ALIGNED(size, etp->exp)
@@ -439,7 +659,7 @@ static void flash_stm32_qspi_isr(const struct device *dev)
 {
 	struct flash_stm32_qspi_data *dev_data = DEV_DATA(dev);
 
-	HAL_QSPI_IRQHandler(&dev_data->hqspi);
+	HAL_QSPI_IRQHANDLER(&dev_data->hqspi);
 }
 
 /* This function is executed in the interrupt context */
@@ -466,7 +686,7 @@ __weak HAL_StatusTypeDef HAL_DMA_Abort_IT(DMA_HandleTypeDef *hdma)
 /*
  * Transfer Error callback.
  */
-void HAL_QSPI_ErrorCallback(QSPI_HandleTypeDef *hqspi)
+void HAL_QSPI_ERRORCALLBACK(OSPI_HandleTypeDef *hqspi)
 {
 	struct flash_stm32_qspi_data *dev_data =
 		CONTAINER_OF(hqspi, struct flash_stm32_qspi_data, hqspi);
@@ -481,7 +701,7 @@ void HAL_QSPI_ErrorCallback(QSPI_HandleTypeDef *hqspi)
 /*
  * Command completed callback.
  */
-void HAL_QSPI_CmdCpltCallback(QSPI_HandleTypeDef *hqspi)
+void HAL_QSPI_CMDCPLTCALLBACK(HAL_QSPI_HANDLETYPEDEF *hqspi)
 {
 	struct flash_stm32_qspi_data *dev_data =
 		CONTAINER_OF(hqspi, struct flash_stm32_qspi_data, hqspi);
@@ -492,7 +712,7 @@ void HAL_QSPI_CmdCpltCallback(QSPI_HandleTypeDef *hqspi)
 /*
  * Rx Transfer completed callback.
  */
-void HAL_QSPI_RxCpltCallback(QSPI_HandleTypeDef *hqspi)
+void HAL_QSPI_RXCPLTCALLBACK(HAL_QSPI_HANDLETYPEDEF *hqspi)
 {
 	struct flash_stm32_qspi_data *dev_data =
 		CONTAINER_OF(hqspi, struct flash_stm32_qspi_data, hqspi);
@@ -503,7 +723,7 @@ void HAL_QSPI_RxCpltCallback(QSPI_HandleTypeDef *hqspi)
 /*
  * Tx Transfer completed callback.
  */
-void HAL_QSPI_TxCpltCallback(QSPI_HandleTypeDef *hqspi)
+void HAL_QSPI_TXCPLTCALLBACK(HAL_QSPI_HANDLETYPEDEF *hqspi)
 {
 	struct flash_stm32_qspi_data *dev_data =
 		CONTAINER_OF(hqspi, struct flash_stm32_qspi_data, hqspi);
@@ -514,7 +734,7 @@ void HAL_QSPI_TxCpltCallback(QSPI_HandleTypeDef *hqspi)
 /*
  * Status Match callback.
  */
-void HAL_QSPI_StatusMatchCallback(QSPI_HandleTypeDef *hqspi)
+void HAL_OSPI_STATUSMATCHCALLBACK(HAL_QSPI_HANDLETYPEDEF *hqspi)
 {
 	struct flash_stm32_qspi_data *dev_data =
 		CONTAINER_OF(hqspi, struct flash_stm32_qspi_data, hqspi);
@@ -525,7 +745,7 @@ void HAL_QSPI_StatusMatchCallback(QSPI_HandleTypeDef *hqspi)
 /*
  * Timeout callback.
  */
-void HAL_QSPI_TimeOutCallback(QSPI_HandleTypeDef *hqspi)
+void HAL_OSPI_TIMEOUTCALLBACK(HAL_QSPI_HANDLETYPEDEF *hqspi)
 {
 	struct flash_stm32_qspi_data *dev_data =
 		CONTAINER_OF(hqspi, struct flash_stm32_qspi_data, hqspi);
@@ -597,7 +817,7 @@ static int setup_pages_layout(const struct device *dev)
 	 * space.
 	 */
 	if ((flash_size % layout_page_size) != 0) {
-		LOG_INF("layout page %u wastes space with device size %zu",
+		LOG_WRN("layout page %u wastes space with device size %zu",
 			layout_page_size, flash_size);
 	}
 
@@ -620,10 +840,10 @@ static int spi_nor_process_bfp(const struct device *dev,
 	const size_t flash_size = jesd216_bfp_density(bfp) / 8U;
 
 	if (flash_size != dev_cfg->flash_size) {
-		LOG_ERR("Unexpected flash size: %u", flash_size);
+		LOG_ERR("Unexpected flash size: %u [Expect: %u]", flash_size, dev_cfg->flash_size);
 	}
 
-	LOG_INF("%s: %u MiBy flash", dev->name, (uint32_t)(flash_size >> 20));
+	LOG_DBG("%s: %u MiBy flash", dev->name, (uint32_t)(flash_size >> 20));
 
 	/* Copy over the erase types, preserving their order.  (The
 	 * Sector Map Parameter table references them by index.)
@@ -631,7 +851,7 @@ static int spi_nor_process_bfp(const struct device *dev,
 	memset(data->erase_types, 0, sizeof(data->erase_types));
 	for (uint8_t ti = 1; ti <= ARRAY_SIZE(data->erase_types); ++ti) {
 		if (jesd216_bfp_erase(bfp, ti, etp) == 0) {
-			LOG_DBG("Erase %u with %02x",
+			LOG_DBG("Erase %u with 0x%02x",
 					(uint32_t)BIT(etp->exp), etp->cmd);
 		}
 		++etp;
@@ -650,8 +870,13 @@ static int flash_stm32_qspi_init(const struct device *dev)
 	struct flash_stm32_qspi_data *dev_data = DEV_DATA(dev);
 	uint32_t ahb_clock_freq;
 	uint32_t prescaler = 0;
+	HAL_StatusTypeDef hal_ret;
 	int ret;
 
+	if (dev_cfg->pinctrl_list_size == 0) {
+		LOG_ERR("No pinctrl defined for QSPI.");
+		return -EIO;
+	}
 	/* Signals configuration */
 	ret = stm32_dt_pinctrl_configure(dev_cfg->pinctrl_list,
 					 dev_cfg->pinctrl_list_size,
@@ -662,6 +887,7 @@ static int flash_stm32_qspi_init(const struct device *dev)
 	}
 
 #if STM32_QSPI_USE_DMA
+	LOG_DBG("Using DMA");
 	/*
 	 * DMA configuration
 	 * Due to use of QSPI HAL API in current driver,
@@ -684,7 +910,8 @@ static int flash_stm32_qspi_init(const struct device *dev)
 	dma_cfg.linked_channel = STM32_DMA_HAL_OVERRIDE;
 	ret = dma_config(dev_data->dma.dev, dev_data->dma.channel, &dma_cfg);
 	if (ret != 0) {
-		return ret;
+		LOG_ERR("%d: Failed to configure DMA", ret);
+		return -EIO;
 	}
 
 	/* Proceed to the HAL DMA driver init */
@@ -721,7 +948,11 @@ static int flash_stm32_qspi_init(const struct device *dev)
 
 	/* Initialize DMA HAL */
 	__HAL_LINKDMA(&dev_data->hqspi, hdma, hdma);
-	HAL_DMA_Init(&hdma);
+	hal_ret = HAL_DMA_Init(&hdma);
+	if (hal_ret != HAL_OK) {
+		LOG_ERR("%d: Failed to initialize DMA", hal_ret);
+		return -EIO;
+	}
 
 #endif /* STM32_QSPI_USE_DMA */
 
@@ -749,9 +980,38 @@ static int flash_stm32_qspi_init(const struct device *dev)
 	__ASSERT_NO_MSG(prescaler <= STM32_QSPI_CLOCK_PRESCALER_MAX);
 	/* Initialize QSPI HAL */
 	dev_data->hqspi.Init.ClockPrescaler = prescaler;
+#ifndef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
 	dev_data->hqspi.Init.FlashSize = find_lsb_set(dev_cfg->flash_size);
+#else
+	dev_data->hqspi.Init.DeviceSize = find_lsb_set(dev_cfg->flash_size);
+#endif
 
-	HAL_QSPI_Init(&dev_data->hqspi);
+#ifndef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
+	hal_ret = HAL_QSPI_Init(&dev_data->hqspi);
+#else
+	hal_ret = HAL_OSPI_Init(&dev_data->hqspi);
+#endif
+	if (hal_ret != HAL_OK) {
+		LOG_ERR("%d: Failed to initialize QSPI", hal_ret);
+		return -EIO;
+	}
+
+#ifdef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
+	/* OSPI uses an dedicated I/O Manager */
+	OSPIM_CfgTypeDef sOspiManagerCfg = {0};
+
+	sOspiManagerCfg.ClkPort = DT_PROP(STM32_QSPI_NODE, clock_port);
+	sOspiManagerCfg.NCSPort = DT_PROP(STM32_QSPI_NODE, ncs_port);
+	sOspiManagerCfg.IOLowPort = DT_PROP(STM32_QSPI_NODE, io_low_port);
+	sOspiManagerCfg.Req2AckTime = DT_PROP(STM32_QSPI_NODE, req_2_ack_time);
+
+	hal_ret = HAL_OSPIM_Config(&dev_data->hqspi,
+			&sOspiManagerCfg, HAL_OSPI_TIMEOUT_DEFAULT_VALUE);
+	if (hal_ret != HAL_OK) {
+		LOG_ERR("%d: Failed to configure OCTOSPIM", hal_ret);
+		return -EIO;
+	}
+#endif
 
 	/* Initialize semaphores */
 	k_sem_init(&dev_data->sem, 1, 1);
@@ -782,7 +1042,7 @@ static int flash_stm32_qspi_init(const struct device *dev)
 		return -EINVAL;
 	}
 
-	LOG_INF("%s: SFDP v %u.%u AP %x with %u PH", dev->name,
+	LOG_DBG("%s: SFDP v %u.%u AP %x with %u PH", dev->name,
 		hp->rev_major, hp->rev_minor, hp->access, 1 + hp->nph);
 
 	const struct jesd216_param_header *php = hp->phdr;
@@ -792,7 +1052,7 @@ static int flash_stm32_qspi_init(const struct device *dev)
 	while (php != phpe) {
 		uint16_t id = jesd216_param_id(php);
 
-		LOG_INF("PH%u: %04x rev %u.%u: %u DW @ %x",
+		LOG_DBG("PH%u: %04x rev %u.%u: %u DW @ %x",
 			(php - hp->phdr), id, php->rev_major, php->rev_minor,
 			php->len_dw, jesd216_param_addr(php));
 
@@ -825,7 +1085,14 @@ static int flash_stm32_qspi_init(const struct device *dev)
 	}
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */
 
-	LOG_INF("Device %s initialized", DEV_NAME(dev));
+	ret = qspi_quad_output_set(dev, STM32_QSPI_USE_FOUR_DATALINES);
+	if (ret < 0) {
+		LOG_ERR("Enabling quad output");
+		return -EIO;
+	}
+	LOG_DBG("Set quad output: %s", STM32_QSPI_USE_FOUR_DATALINES ? "true" : "false");
+
+	LOG_DBG("Device %s initialized", DEV_NAME(dev));
 
 	return 0;
 }
@@ -856,18 +1123,27 @@ static int flash_stm32_qspi_init(const struct device *dev)
 			(NULL))						\
 		},
 
-#define QSPI_FLASH_MODULE(drv_id, flash_id) 				\
+#define QSPI_FLASH_MODULE(drv_id, flash_id)				\
 		(DT_DRV_INST(drv_id), qspi_nor_flash_##flash_id)
 
 static void flash_stm32_qspi_irq_config_func(const struct device *dev);
 
+#ifndef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
 static const struct soc_gpio_pinctrl qspi_pins[] =
 					ST_STM32_DT_PINCTRL(quadspi, 0);
-
-#define STM32_QSPI_NODE DT_PARENT(DT_DRV_INST(0))
+#else
+/* It's not possible to get the "name device node label identifier" of a parent */
+#if DT_SAME_NODE(DT_NODELABEL(octospi1), STM32_QSPI_NODE)
+static const struct soc_gpio_pinctrl qspi_pins[] =
+				ST_STM32_DT_PINCTRL(octospi1, 0);
+#elif DT_SAME_NODE(DT_NODELABEL(octospi2), STM32_QSPI_NODE)
+static const struct soc_gpio_pinctrl qspi_pins[] =
+				ST_STM32_DT_PINCTRL(octospi2, 0);
+#endif
+#endif
 
 static const struct flash_stm32_qspi_config flash_stm32_qspi_cfg = {
-	.regs = (QUADSPI_TypeDef *)DT_REG_ADDR(STM32_QSPI_NODE),
+	.regs = (HAL_QSPI_TYPEDEF *)DT_REG_ADDR(STM32_QSPI_NODE),
 	.pclken = {
 		.enr = DT_CLOCKS_CELL(STM32_QSPI_NODE, bits),
 		.bus = DT_CLOCKS_CELL(STM32_QSPI_NODE, bus)
@@ -881,13 +1157,23 @@ static const struct flash_stm32_qspi_config flash_stm32_qspi_cfg = {
 
 static struct flash_stm32_qspi_data flash_stm32_qspi_dev_data = {
 	.hqspi = {
-		.Instance = (QUADSPI_TypeDef *)DT_REG_ADDR(STM32_QSPI_NODE),
+		.Instance = (HAL_QSPI_TYPEDEF *)DT_REG_ADDR(STM32_QSPI_NODE),
 		.Init = {
 			.FifoThreshold = STM32_QSPI_FIFO_THRESHOLD,
+#ifndef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
 			.SampleShifting = QSPI_SAMPLE_SHIFTING_NONE,
 			.ChipSelectHighTime = QSPI_CS_HIGH_TIME_1_CYCLE,
 			.ClockMode = QSPI_CLOCK_MODE_0,
-			},
+#else
+#if DT_PROP(STM32_QSPI_NODE, chip_select_boundary) > 0
+#error OSPI ChipSelectBoundary needs to be zero
+#endif
+			.SampleShifting = HAL_OSPI_SAMPLE_SHIFTING_NONE,
+			.ChipSelectHighTime = 1,
+			.ClockMode = HAL_OSPI_CLOCK_MODE_0,
+			.ClockPrescaler = 1,
+#endif
+		},
 	},
 	QSPI_DMA_CHANNEL(STM32_QSPI_NODE, tx_rx)
 };

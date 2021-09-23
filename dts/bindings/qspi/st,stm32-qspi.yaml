@@ -48,3 +48,10 @@ properties:
     pinctrl-0:
       type: phandles
       required: true
+
+    use-four-datalines:
+      type: boolean
+      description: |
+        Enable Data Read and Writes to utilize the QSPI's
+        four data lines. This is disabled by default to
+        maintain backwards compatibility.
