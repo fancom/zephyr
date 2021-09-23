@@ -11,6 +11,9 @@
 #include "smp/smp.h"
 #include "mgmt/mcumgr/smp.h"
 
+#include <logging/log.h>
+LOG_MODULE_REGISTER(smp_processor);
+
 static mgmt_alloc_rsp_fn zephyr_smp_alloc_rsp;
 static mgmt_trim_front_fn zephyr_smp_trim_front;
 static mgmt_reset_buf_fn zephyr_smp_reset_buf;
@@ -72,7 +75,7 @@ zephyr_smp_trim_front(void *buf, size_t len, void *arg)
 
 /**
  * Splits an appropriately-sized fragment from the front of a net_buf, as
- * neeeded.  If the length of the net_buf is greater than specified maximum
+ * needed.  If the length of the net_buf is greater than specified maximum
  * fragment size, a new net_buf is allocated, and data is moved from the source
  * net_buf to the new net_buf.  If the net_buf is small enough to fit in a
  * single fragment, the source net_buf is returned unmodified, and the supplied
@@ -117,6 +120,9 @@ zephyr_smp_split_frag(struct net_buf **nb, void *arg, uint16_t mtu)
 		frag = src;
 	} else {
 		frag = zephyr_smp_alloc_rsp(src, arg);
+		if (!frag) {
+			return NULL;
+		}
 
 		/* Copy fragment payload into new buffer. */
 		net_buf_add_mem(frag, src->data, mtu);
@@ -135,14 +141,12 @@ zephyr_smp_reset_buf(void *buf, void *arg)
 }
 
 static int
-zephyr_smp_write_at(struct cbor_encoder_writer *writer, size_t offset,
+zephyr_smp_write_at(struct cbor_nb_writer *writer, size_t offset,
 		    const void *data, size_t len, void *arg)
 {
-	struct cbor_nb_writer *czw;
 	struct net_buf *nb;
 
-	czw = (struct cbor_nb_writer *)writer;
-	nb = czw->nb;
+	nb = writer->nb;
 
 	if (offset > nb->len) {
 		return MGMT_ERR_EINVAL;
@@ -155,7 +159,6 @@ zephyr_smp_write_at(struct cbor_encoder_writer *writer, size_t offset,
 	memcpy(nb->data + offset, data, len);
 	if (nb->len < offset + len) {
 		nb->len = offset + len;
-		writer->bytes_written = nb->len;
 	}
 
 	return 0;
@@ -174,6 +177,8 @@ zephyr_smp_tx_rsp(struct smp_streamer *ns, void *rsp, void *arg)
 	zst = arg;
 	nb = rsp;
 
+	LOG_ERR("zephyr_smp_tx_rsp: to emit nb at address %X of size %d, max size %d", nb->data, nb->len, nb->size);
+
 	mtu = zst->zst_get_mtu(rsp);
 	if (mtu == 0U) {
 		/* The transport cannot support a transmission right now. */
@@ -184,6 +189,7 @@ zephyr_smp_tx_rsp(struct smp_streamer *ns, void *rsp, void *arg)
 	while (nb != NULL) {
 		frag = zephyr_smp_split_frag(&nb, zst, mtu);
 		if (frag == NULL) {
+			zephyr_smp_free_buf(nb, zst);
 			return MGMT_ERR_ENOMEM;
 		}
 
@@ -213,25 +219,19 @@ zephyr_smp_free_buf(void *buf, void *arg)
 }
 
 static int
-zephyr_smp_init_reader(struct cbor_decoder_reader *reader, void *buf,
+zephyr_smp_init_reader(struct cbor_nb_reader *reader, void *buf,
 		       void *arg)
 {
-	struct cbor_nb_reader *czr;
-
-	czr = (struct cbor_nb_reader *)reader;
-	cbor_nb_reader_init(czr, buf);
+	cbor_nb_reader_init(reader, buf);
 
 	return 0;
 }
 
 static int
-zephyr_smp_init_writer(struct cbor_encoder_writer *writer, void *buf,
+zephyr_smp_init_writer(struct cbor_nb_writer *writer, void *buf,
 		       void *arg)
 {
-	struct cbor_nb_writer *czw;
-
-	czw = (struct cbor_nb_writer *)writer;
-	cbor_nb_writer_init(czw, buf);
+	cbor_nb_writer_init(writer, buf);
 
 	return 0;
 }
@@ -243,20 +243,22 @@ static int
 zephyr_smp_process_packet(struct zephyr_smp_transport *zst,
 			  struct net_buf *nb)
 {
-	struct cbor_nb_reader reader;
-	struct cbor_nb_writer writer;
 	struct smp_streamer streamer;
 	int rc;
 
 	streamer = (struct smp_streamer) {
 		.mgmt_stmr = {
 			.cfg = &zephyr_smp_cbor_cfg,
-			.reader = &reader.r,
-			.writer = &writer.enc,
+			.reader.nb = nb,
 			.cb_arg = zst,
 		},
 		.tx_rsp_cb = zephyr_smp_tx_rsp,
 	};
+
+	LOG_ERR("Processing packet of length %d at address %X", nb->len, nb->data);
+	/*for (rc = 0; rc < nb->len; rc++) {
+		LOG_ERR("P[%d]:%X", rc, nb->data[rc]);
+	}*/
 
 	rc = smp_process_request_packet(&streamer, nb);
 	return rc;
@@ -294,11 +296,13 @@ zephyr_smp_transport_init(struct zephyr_smp_transport *zst,
 
 	k_work_init(&zst->zst_work, zephyr_smp_handle_reqs);
 	k_fifo_init(&zst->zst_fifo);
+	//printk("Initializing fifo at address %X", &zst->zst_fifo);
 }
 
 void
 zephyr_smp_rx_req(struct zephyr_smp_transport *zst, struct net_buf *nb)
 {
+	//printk("Placing data onto fifo at address %X", &zst->zst_fifo);
 	net_buf_put(&zst->zst_fifo, nb);
 	k_work_submit(&zst->zst_work);
 }
