@@ -36,6 +36,8 @@
 LOG_MODULE_REGISTER(smp_sample);
 
 #include "common.h"
+#include "drivers/gpio.h"
+#include "debug/thread_analyzer.h"
 
 /* Define an example stats group; approximates seconds since boot. */
 STATS_SECT_START(smp_svr_stats)
@@ -62,6 +64,26 @@ static struct fs_mount_t littlefs_mnt = {
 
 void main(void)
 {
+	int gpio_rc = gpio_pin_configure(
+		device_get_binding(DT_GPIO_LABEL(DT_ALIAS(ethsw_reset_gpio), gpios)),
+		DT_GPIO_PIN(DT_ALIAS(ethsw_reset_gpio), gpios),
+		GPIO_OUTPUT_INACTIVE | DT_GPIO_FLAGS(DT_ALIAS(ethsw_reset_gpio), gpios));
+	LOG_INF("gpio_pin_configure %d", gpio_rc);
+	assert(gpio_rc == 0);
+	gpio_rc = gpio_pin_set(
+		device_get_binding(DT_GPIO_LABEL(DT_ALIAS(ethsw_reset_gpio), gpios)),
+		DT_GPIO_PIN(DT_ALIAS(ethsw_reset_gpio), gpios), true);
+	LOG_INF("gpio_pin_set %d", gpio_rc);
+	assert(gpio_rc == 0);
+    k_sleep(K_MSEC(100));
+	gpio_rc = gpio_pin_set(
+		device_get_binding(DT_GPIO_LABEL(DT_ALIAS(ethsw_reset_gpio), gpios)),
+		DT_GPIO_PIN(DT_ALIAS(ethsw_reset_gpio), gpios), false);
+	LOG_INF("gpio_pin_set %d", gpio_rc);
+	assert(gpio_rc == 0);
+    k_sleep(K_MSEC(500));
+
+	LOG_INF("Hello example 1");
 	int rc = STATS_INIT_AND_REG(smp_svr_stats, STATS_SIZE_32,
 				    "smp_svr_stats");
 
@@ -97,6 +119,7 @@ void main(void)
 	start_smp_bluetooth();
 #endif
 #ifdef CONFIG_MCUMGR_SMP_UDP
+	//thread_analyzer_print();
 	start_smp_udp();
 #endif
 
