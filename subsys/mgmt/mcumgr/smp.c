@@ -11,9 +11,6 @@
 #include "smp/smp.h"
 #include "mgmt/mcumgr/smp.h"
 
-#include <logging/log.h>
-LOG_MODULE_REGISTER(smp_processor);
-
 static mgmt_alloc_rsp_fn zephyr_smp_alloc_rsp;
 static mgmt_trim_front_fn zephyr_smp_trim_front;
 static mgmt_reset_buf_fn zephyr_smp_reset_buf;
@@ -177,8 +174,6 @@ zephyr_smp_tx_rsp(struct smp_streamer *ns, void *rsp, void *arg)
 	zst = arg;
 	nb = rsp;
 
-	LOG_ERR("zephyr_smp_tx_rsp: to emit nb at address %X of size %d, max size %d", nb->data, nb->len, nb->size);
-
 	mtu = zst->zst_get_mtu(rsp);
 	if (mtu == 0U) {
 		/* The transport cannot support a transmission right now. */
@@ -255,11 +250,6 @@ zephyr_smp_process_packet(struct zephyr_smp_transport *zst,
 		.tx_rsp_cb = zephyr_smp_tx_rsp,
 	};
 
-	LOG_ERR("Processing packet of length %d at address %X", nb->len, nb->data);
-	/*for (rc = 0; rc < nb->len; rc++) {
-		LOG_ERR("P[%d]:%X", rc, nb->data[rc]);
-	}*/
-
 	rc = smp_process_request_packet(&streamer, nb);
 	return rc;
 }
@@ -296,13 +286,11 @@ zephyr_smp_transport_init(struct zephyr_smp_transport *zst,
 
 	k_work_init(&zst->zst_work, zephyr_smp_handle_reqs);
 	k_fifo_init(&zst->zst_fifo);
-	//printk("Initializing fifo at address %X", &zst->zst_fifo);
 }
 
 void
 zephyr_smp_rx_req(struct zephyr_smp_transport *zst, struct net_buf *nb)
 {
-	//printk("Placing data onto fifo at address %X", &zst->zst_fifo);
 	net_buf_put(&zst->zst_fifo, nb);
 	k_work_submit(&zst->zst_work);
 }

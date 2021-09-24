@@ -119,8 +119,6 @@ static void smp_udp_receive_thread(void *p1, void *p2, void *p3)
 			struct sockaddr *ud;
 			struct net_buf *nb;
 
-			LOG_ERR("Received packet of length %d", len);
-
 			/* store sender address in user data for reply */
 			nb = mcumgr_buf_alloc();
 			if (!nb) {
