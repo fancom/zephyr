@@ -66,7 +66,8 @@ extern "C" {
 
 /* Trailer: */
 #ifndef CONFIG_FLASH_ALIGNMENT_WORD_SIZE_BYTES
-#error "expecting flash alignment to be defined"
+#warning "expecting flash alignment to be defined, using 8 bytes as default"
+#define CONFIG_FLASH_ALIGNMENT_WORD_SIZE_BYTES 8
 #endif
 
 #define BOOT_MAX_ALIGN          CONFIG_FLASH_ALIGNMENT_WORD_SIZE_BYTES
