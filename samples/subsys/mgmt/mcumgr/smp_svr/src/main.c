@@ -119,7 +119,6 @@ void main(void)
 	start_smp_bluetooth();
 #endif
 #ifdef CONFIG_MCUMGR_SMP_UDP
-	//thread_analyzer_print();
 	start_smp_udp();
 #endif
 

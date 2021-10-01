@@ -12,8 +12,6 @@ cmake_minimum_required(VERSION 3.13.1)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(smp_svr)
 
-set(CMAKE_VERBOSE_MAKEFILE ON)
-
 zephyr_compile_definitions(CBOR_NO_FLOATING_POINT=1 CBOR_NO_HALF_FLOAT_TYPE=1)
 
 target_sources(app PRIVATE src/main.c)
