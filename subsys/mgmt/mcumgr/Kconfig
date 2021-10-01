@@ -30,13 +30,6 @@ config MGMT_CBORATTR_MAX_SIZE
         help
           The maximum size of a CBOR attribute during decoding
 
-config FLASH_ALIGNMENT_WORD_SIZE_BYTES
-	int "Size of the flash word"
-	depends on BOOTLOADER_MCUBOOT
-	default 8
-	help
-	  Sets the alignment size of a flash word.
-
 menu "Command Handlers"
 menuconfig MCUMGR_CMD_FS_MGMT
 	bool "Enable mcumgr handlers for file management (insecure)"
