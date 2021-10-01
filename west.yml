@@ -100,7 +100,7 @@ manifest:
     - name: mcumgr
       repo-path: mynewt-mcumgr
       remote: optima
-      revision: 7203a39cdfe71cc713da6496b2b6f90bce532b26
+      revision: f946de528c4d99f82e776208491a466045eebb66
       path: modules/lib/mcumgr
     - name: net-tools
       revision: f49bd1354616fae4093bf36e5eaee43c51a55127
