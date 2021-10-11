@@ -127,7 +127,7 @@ manifest:
       path: modules/lib/tinycbor
       repo-path: tinycbor
       remote: optima
-      revision: 69e745dd9d4975a770ca70195f61510b43e125d4
+      revision: 7e9cd89091b196ab7c0486b2a768c3725ffedde6
     - name: tinycrypt
       path: modules/crypto/tinycrypt
       revision: 3e9a49d2672ec01435ffbf0d788db6d95ef28de0
