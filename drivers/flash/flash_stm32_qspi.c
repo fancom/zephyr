@@ -1092,6 +1092,9 @@ static int flash_stm32_qspi_init(const struct device *dev)
 	}
 	LOG_DBG("Set quad output: %s", STM32_QSPI_USE_FOUR_DATALINES ? "true" : "false");
 
+	/* wait until quad output is set before doing an immediate read/write call */
+	qspi_wait_until_ready(dev);
+
 	LOG_DBG("Device %s initialized", DEV_NAME(dev));
 
 	return 0;
