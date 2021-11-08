@@ -66,4 +66,10 @@ config LOG_BACKEND_FORMAT_TIMESTAMP
 	help
 	  When enabled timestamp is formatted to hh:mm:ss:ms,us.
 
+config LOG_UTC_TIMESTAMP
+	bool "Format LOG timestamp as Unix timestamp"
+	default n
+	help
+	  When enabled, unix timestamp is formatted to hh:mm:ss.ms
+
 endmenu

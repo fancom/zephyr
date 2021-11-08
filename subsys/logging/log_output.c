@@ -214,9 +214,24 @@ static int timestamp_print(const struct log_output *output,
 					hours, mins, seconds, ms * 1000U + us);
 #endif
 		} else {
+#if defined(CONFIG_NEWLIB_LIBC) && defined(CONFIG_LOG_UTC_TIMESTAMP)
+			char time_str[sizeof("00:00:00")];
+			struct _tm *tm;
+			time_t _time;
+
+			_time = total_seconds;
+			_tm = gmtime(&_time);
+			auto milliseconds = k_uptime_get() % 1000;
+
+			strftime(time_str, sizeof(time_str), "%T", _tm);
+
+			length = print_formatted(output, "%s.%03d ",
+						 time_str, milliseconds);
+#else
 			length = print_formatted(output,
 						 "[%02d:%02d:%02d.%03d,%03d] ",
 						 hours, mins, seconds, ms, us);
+#endif
 		}
 	} else {
 		length = 0;
