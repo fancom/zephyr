@@ -216,12 +216,12 @@ static int timestamp_print(const struct log_output *output,
 		} else {
 #if defined(CONFIG_NEWLIB_LIBC) && defined(CONFIG_LOG_UTC_TIMESTAMP)
 			char time_str[sizeof("00:00:00")];
-			struct _tm *tm;
+			struct tm *_tm;
 			time_t _time;
 
 			_time = total_seconds;
 			_tm = gmtime(&_time);
-			auto milliseconds = k_uptime_get() % 1000;
+			int16_t milliseconds = k_uptime_get() % 1000;
 
 			strftime(time_str, sizeof(time_str), "%T", _tm);
 
