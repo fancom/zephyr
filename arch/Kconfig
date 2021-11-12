@@ -199,6 +199,14 @@ config FLASH_BASE_ADDRESS
 	  normally set by the board's defconfig file and the user should generally
 	  avoid modifying it via the menu configuration.
 
+config FLASH_ALIGNMENT_WORD_SIZE_BYTES
+	int "Size of the flash word"
+	default 8
+	help
+	  Sets the alignment size of a flash word. It is
+	  normally set by the board's defconfig file and the user should generally
+	  avoid modifying it via the menu configuration.
+
 endif # ARM || ARM64 || ARC || NIOS2 || X86
 
 if ARCH_HAS_TRUSTED_EXECUTION
