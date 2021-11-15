@@ -95,7 +95,7 @@ manifest:
     - name: mcuboot
       repo-path: mcuboot
       remote: optima
-      revision: 267ece9b5c7f79d55e1bf680e5bb79640354ece5
+      revision: 218c4a519507c67eb4d41663b76cffd7581c1f2a
       path: bootloader/mcuboot
     - name: mcumgr
       repo-path: mynewt-mcumgr
