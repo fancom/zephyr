@@ -65,16 +65,15 @@ extern "C" {
 #define BOOT_IMG_VER_STRLEN_MAX 25  /* 255.255.65535.4294967295\0 */
 
 /* Trailer: */
-#ifndef CONFIG_FLASH_ALIGNMENT_WORD_SIZE_BYTES
-#warning "expecting flash alignment to be defined, using 8 bytes as default"
-#define CONFIG_FLASH_ALIGNMENT_WORD_SIZE_BYTES 8
+#define FLASH_WRITE_BLOCK_SIZE \
+	DT_PROP(DT_CHOSEN(zephyr_flash), write_block_size)
+
+#ifndef BOOT_MAX_ALIGN
+#define BOOT_MAX_ALIGN (FLASH_WRITE_BLOCK_SIZE > 16 ? FLASH_WRITE_BLOCK_SIZE : 8)
 #endif
 
-#define BOOT_MAX_ALIGN          CONFIG_FLASH_ALIGNMENT_WORD_SIZE_BYTES
-
 #ifndef BOOT_MAGIC_SZ
-#define BOOT_MAGIC_SZ (CONFIG_FLASH_ALIGNMENT_WORD_SIZE_BYTES > 16 ?\
-						CONFIG_FLASH_ALIGNMENT_WORD_SIZE_BYTES : 16)
+#define BOOT_MAGIC_SZ (FLASH_WRITE_BLOCK_SIZE > 16 ? FLASH_WRITE_BLOCK_SIZE : 16)
 #endif
 
 #define BOOT_TRAILER_IMG_STATUS_OFFS(bank_area) ((bank_area)->fa_size -\
