@@ -371,7 +371,10 @@ static int uart_stm32_configure(const struct device *dev,
 #ifndef LL_USART_DATAWIDTH_7B
 	    || (cfg->data_bits == UART_CFG_DATA_BITS_7)
 #endif /* LL_USART_DATAWIDTH_7B */
-	    || (cfg->data_bits == UART_CFG_DATA_BITS_9)) {
+#ifndef LL_USART_DATAWIDTH_9B
+	    || (cfg->data_bits == UART_CFG_DATA_BITS_9)
+#endif /* LL_USART_DATAWIDTH_9B */
+		) {
 		return -ENOTSUP;
 	}
 
