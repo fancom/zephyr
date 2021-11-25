@@ -253,7 +253,7 @@ static int qspi_write_access(const struct device *dev, HAL_QSPI_COMMAND *cmd,
 #if STM32_QSPI_USE_DMA
 	hal_ret = HAL_QSPI_TRANSMIT_DMA(&dev_data->hqspi, (uint8_t *)data);
 #else
-	hal_ret = HAL_OSPI_Transmit_IT(&dev_data->hqspi, (uint8_t *)data);
+	hal_ret = HAL_QSPI_TRANSMIT_IT(&dev_data->hqspi, (uint8_t *)data);
 #endif
 	if (hal_ret != HAL_OK) {
 		LOG_ERR("%d: Failed to read data", hal_ret);
@@ -686,7 +686,7 @@ __weak HAL_StatusTypeDef HAL_DMA_Abort_IT(DMA_HandleTypeDef *hdma)
 /*
  * Transfer Error callback.
  */
-void HAL_QSPI_ERRORCALLBACK(OSPI_HandleTypeDef *hqspi)
+void HAL_QSPI_ERRORCALLBACK(HAL_QSPI_HANDLETYPEDEF *hqspi)
 {
 	struct flash_stm32_qspi_data *dev_data =
 		CONTAINER_OF(hqspi, struct flash_stm32_qspi_data, hqspi);
