@@ -251,7 +251,7 @@ def string_create_helper(region, memory_type,
         else:
             if memory_type != 'SRAM' and region == 'rodata':
                 align_size = 0
-                if memory_type in mpu_align.keys():
+                if memory_type in mpu_align:
                     align_size = mpu_align[memory_type]
 
                 linker_string += LINKER_SECTION_SEQ_MPU.format(memory_type.lower(), region, memory_type.upper(),
@@ -399,22 +399,24 @@ def create_dict_wrt_mem():
     if args.input_rel_dict == '':
         sys.exit("Disable CONFIG_CODE_DATA_RELOCATION if no file needs relocation")
     for line in args.input_rel_dict.split(';'):
-        # ignore custom lines with only preprocessor defines, separated by a ';'
-        if ':' in line:
-            mem_region, file_name = line.split(':', 1)
+        if not ':' in line:
+            # ignore custom lines with only preprocessor defines, separated by a ';'
+            continue
 
-            file_name_list = glob.glob(file_name)
-            if not file_name_list:
-                warnings.warn("File: "+file_name+" Not found")
-                continue
-            if mem_region == '':
-                continue
-            if args.verbose:
-                print("Memory region ", mem_region, " Selected for file:", file_name_list)
-            if mem_region in rel_dict:
-                rel_dict[mem_region].extend(file_name_list)
-            else:
-                rel_dict[mem_region] = file_name_list
+        mem_region, file_name = line.split(':', 1)
+
+        file_name_list = glob.glob(file_name)
+        if not file_name_list:
+            warnings.warn("File: "+file_name+" Not found")
+            continue
+        if mem_region == '':
+            continue
+        if args.verbose:
+            print("Memory region ", mem_region, " Selected for file:", file_name_list)
+        if mem_region in rel_dict:
+            rel_dict[mem_region].extend(file_name_list)
+        else:
+            rel_dict[mem_region] = file_name_list
 
     return rel_dict
 
