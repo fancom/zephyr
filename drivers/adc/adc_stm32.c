@@ -278,6 +278,7 @@ static void adc_stm32_wait_after_calibration(const struct device *dev)
 	 */
 	const struct adc_stm32_cfg *config = dev->config;
 	uint32_t adc_rate, wait_cycles;
+
 	const struct device *clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
 	if (clock_control_get_rate(clk,
 		(clock_control_subsys_t *) &config->pclken, &adc_rate) < 0) {
@@ -300,10 +301,10 @@ static void adc_stm32_wait_until_enabled(const ADC_TypeDef *adc)
 	defined(CONFIG_SOC_SERIES_STM32G4X) || \
 	defined(CONFIG_SOC_SERIES_STM32H7X)
 	/*
-	* Enabling ADC modules in L4, WB, G0 and G4 series may fail if they are
-	* still not stabilized, this will wait for a short time to ensure ADC
-	* modules are properly enabled.
-	*/
+	 * Enabling ADC modules in L4, WB, G0 and G4 series may fail if they are
+	 * still not stabilized, this will wait for a short time to ensure ADC
+	 * modules are properly enabled.
+	 */
 	uint32_t countTimeout = 0;
 
 	while (LL_ADC_IsActiveFlag_ADRDY(adc) == 0) {
