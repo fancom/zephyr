@@ -253,6 +253,71 @@ static int check_buffer_size(const struct adc_sequence *sequence,
 	return 0;
 }
 
+static void adc_stm32_disable_adc(const ADC_TypeDef *adc)
+{
+	if (LL_ADC_IsEnabled(adc) == 1UL) {
+		LL_ADC_Disable(adc);
+		while (LL_ADC_IsEnabled(adc) == 1UL) {
+		}
+	}
+}
+
+static void adc_stm32_wait_after_calibration(const struct device *dev)
+{
+#if defined(CONFIG_SOC_SERIES_STM32F0X) || \
+	defined(CONFIG_SOC_SERIES_STM32F3X) || \
+	defined(CONFIG_SOC_SERIES_STM32L0X) || \
+	defined(CONFIG_SOC_SERIES_STM32L4X) || \
+	defined(CONFIG_SOC_SERIES_STM32WBX) || \
+	defined(CONFIG_SOC_SERIES_STM32G0X) || \
+	defined(CONFIG_SOC_SERIES_STM32G4X) || \
+	defined(CONFIG_SOC_SERIES_STM32H7X)
+	/*
+	 * ADC modules on these series have to wait for some cycles to be
+	 * enabled after doing a calibration.
+	 */
+	const struct adc_stm32_cfg *config = dev->config;
+	uint32_t adc_rate, wait_cycles;
+	const struct device *clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
+	if (clock_control_get_rate(clk,
+		(clock_control_subsys_t *) &config->pclken, &adc_rate) < 0) {
+		LOG_ERR("ADC clock rate get error.");
+	}
+
+	wait_cycles = SystemCoreClock / adc_rate *
+		LL_ADC_DELAY_CALIB_ENABLE_ADC_CYCLES;
+
+	for (int i = wait_cycles; i >= 0; i--) {
+	}
+#endif
+}
+
+static void adc_stm32_wait_until_enabled(const ADC_TypeDef *adc)
+{
+#if defined(CONFIG_SOC_SERIES_STM32L4X) || \
+	defined(CONFIG_SOC_SERIES_STM32WBX) || \
+	defined(CONFIG_SOC_SERIES_STM32G0X) || \
+	defined(CONFIG_SOC_SERIES_STM32G4X) || \
+	defined(CONFIG_SOC_SERIES_STM32H7X)
+	/*
+	* Enabling ADC modules in L4, WB, G0 and G4 series may fail if they are
+	* still not stabilized, this will wait for a short time to ensure ADC
+	* modules are properly enabled.
+	*/
+	uint32_t countTimeout = 0;
+
+	while (LL_ADC_IsActiveFlag_ADRDY(adc) == 0) {
+		if (LL_ADC_IsEnabled(adc) == 0UL) {
+			LL_ADC_Enable(adc);
+			countTimeout++;
+			if (countTimeout == 10) {
+				return -ETIMEDOUT;
+			}
+		}
+	}
+#endif
+}
+
 static void adc_stm32_start_conversion(const struct device *dev)
 {
 	const struct adc_stm32_cfg *config = dev->config;
@@ -449,11 +514,7 @@ static int start_read(const struct device *dev,
 	 * Errata: Writing ADC_CFGR1 register while ADEN bit is set
 	 * resets RES[1:0] bitfield. We need to disable and enable adc.
 	 */
-	if (LL_ADC_IsEnabled(adc) == 1UL) {
-		LL_ADC_Disable(adc);
-	}
-	while (LL_ADC_IsEnabled(adc) == 1UL) {
-	}
+	adc_stm32_disable_adc(adc);
 	LL_ADC_SetResolution(adc, resolution);
 	LL_ADC_Enable(adc);
 	while (LL_ADC_IsActiveFlag_ADRDY(adc) != 1UL) {
@@ -525,7 +586,16 @@ static int start_read(const struct device *dev,
 	!defined(CONFIG_SOC_SERIES_STM32F1X) && \
 	!defined(STM32F3X_ADC_V2_5) && \
 	!defined(CONFIG_SOC_SERIES_STM32L1X)
+		adc_stm32_disable_adc(adc);
 		adc_stm32_calib(dev);
+
+		LL_ADC_ClearFlag_ADRDY(adc);
+
+		adc_stm32_wait_after_calibration(dev);
+
+		LL_ADC_Enable(adc);
+
+		adc_stm32_wait_until_enabled(adc);
 #else
 		LOG_ERR("Calibration not supported");
 		return -ENOTSUP;
@@ -830,9 +900,7 @@ static int adc_stm32_init(const struct device *dev)
 	defined(CONFIG_SOC_SERIES_STM32G0X) || \
 	defined(CONFIG_SOC_SERIES_STM32G4X) || \
 	defined(CONFIG_SOC_SERIES_STM32H7X)
-	if (LL_ADC_IsActiveFlag_ADRDY(adc)) {
-		LL_ADC_ClearFlag_ADRDY(adc);
-	}
+	LL_ADC_ClearFlag_ADRDY(adc);
 
 	/*
 	 * These STM32 series has one internal voltage reference source
@@ -842,56 +910,11 @@ static int adc_stm32_init(const struct device *dev)
 				       LL_ADC_PATH_INTERNAL_VREFINT);
 #endif
 
-#if defined(CONFIG_SOC_SERIES_STM32F0X) || \
-	defined(CONFIG_SOC_SERIES_STM32F3X) || \
-	defined(CONFIG_SOC_SERIES_STM32L0X) || \
-	defined(CONFIG_SOC_SERIES_STM32L4X) || \
-	defined(CONFIG_SOC_SERIES_STM32WBX) || \
-	defined(CONFIG_SOC_SERIES_STM32G0X) || \
-	defined(CONFIG_SOC_SERIES_STM32G4X) || \
-	defined(CONFIG_SOC_SERIES_STM32H7X)
-	/*
-	 * ADC modules on these series have to wait for some cycles to be
-	 * enabled.
-	 */
-	uint32_t adc_rate, wait_cycles;
-
-	if (clock_control_get_rate(clk,
-		(clock_control_subsys_t *) &config->pclken, &adc_rate) < 0) {
-		LOG_ERR("ADC clock rate get error.");
-	}
-
-	wait_cycles = SystemCoreClock / adc_rate *
-		      LL_ADC_DELAY_CALIB_ENABLE_ADC_CYCLES;
-
-	for (int i = wait_cycles; i >= 0; i--) {
-	}
-#endif
+	adc_stm32_wait_after_calibration(dev);
 
 	LL_ADC_Enable(adc);
 
-#if defined(CONFIG_SOC_SERIES_STM32L4X) || \
-	defined(CONFIG_SOC_SERIES_STM32WBX) || \
-	defined(CONFIG_SOC_SERIES_STM32G0X) || \
-	defined(CONFIG_SOC_SERIES_STM32G4X) || \
-	defined(CONFIG_SOC_SERIES_STM32H7X)
-	/*
-	 * Enabling ADC modules in L4, WB, G0 and G4 series may fail if they are
-	 * still not stabilized, this will wait for a short time to ensure ADC
-	 * modules are properly enabled.
-	 */
-	uint32_t countTimeout = 0;
-
-	while (LL_ADC_IsActiveFlag_ADRDY(adc) == 0) {
-		if (LL_ADC_IsEnabled(adc) == 0UL) {
-			LL_ADC_Enable(adc);
-			countTimeout++;
-			if (countTimeout == 10) {
-				return -ETIMEDOUT;
-			}
-		}
-	}
-#endif
+	adc_stm32_wait_until_enabled(adc);
 
 	config->irq_cfg_func();
 
