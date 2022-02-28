@@ -278,8 +278,8 @@ static void adc_stm32_wait_after_calibration(const struct device *dev)
 	 */
 	const struct adc_stm32_cfg *config = dev->config;
 	uint32_t adc_rate, wait_cycles;
-
 	const struct device *clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
+
 	if (clock_control_get_rate(clk,
 		(clock_control_subsys_t *) &config->pclken, &adc_rate) < 0) {
 		LOG_ERR("ADC clock rate get error.");
