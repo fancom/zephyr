@@ -5,27 +5,13 @@
  */
 
 #include <zephyr.h>
+#include <kernel.h>
 #include <sys/printk.h>
 #include <drivers/adc.h>
+#include <logging/log.h>
+LOG_MODULE_REGISTER(adc_sample);
 
-#if !DT_NODE_EXISTS(DT_PATH(zephyr_user)) || \
-	!DT_NODE_HAS_PROP(DT_PATH(zephyr_user), io_channels)
-#error "No suitable devicetree overlay specified"
-#endif
-
-#define ADC_NUM_CHANNELS	DT_PROP_LEN(DT_PATH(zephyr_user), io_channels)
-
-#if ADC_NUM_CHANNELS > 2
-#error "Currently only 1 or 2 channels supported in this sample"
-#endif
-
-#if ADC_NUM_CHANNELS == 2 && !DT_SAME_NODE( \
-	DT_PHANDLE_BY_IDX(DT_PATH(zephyr_user), io_channels, 0), \
-	DT_PHANDLE_BY_IDX(DT_PATH(zephyr_user), io_channels, 1))
-#error "Channels have to use the same ADC."
-#endif
-
-#define ADC_NODE		DT_PHANDLE(DT_PATH(zephyr_user), io_channels)
+#define ADC_NUM_CHANNELS	4
 
 /* Common settings supported by most ADCs */
 #define ADC_RESOLUTION		12
@@ -33,14 +19,12 @@
 #define ADC_REFERENCE		ADC_REF_INTERNAL
 #define ADC_ACQUISITION_TIME	ADC_ACQ_TIME_DEFAULT
 
-/* Get the numbers of up to two channels */
-static uint8_t channel_ids[ADC_NUM_CHANNELS] = {
-	DT_IO_CHANNELS_INPUT_BY_IDX(DT_PATH(zephyr_user), 0),
-#if ADC_NUM_CHANNELS == 2
-	DT_IO_CHANNELS_INPUT_BY_IDX(DT_PATH(zephyr_user), 1)
-#endif
-};
+enum adc_action adc_callback(const struct device *dev,
+						 const struct adc_sequence *sequence,
+						 uint16_t sampling_index);
 
+/* Get the numbers of channels */
+static uint8_t channel_ids[ADC_NUM_CHANNELS] = { 1, 2, 3, 4 };
 static int16_t sample_buffer[ADC_NUM_CHANNELS];
 
 struct adc_channel_cfg channel_cfg = {
@@ -52,7 +36,12 @@ struct adc_channel_cfg channel_cfg = {
 	.differential = 0
 };
 
+struct adc_sequence_options options = {
+	.callback = adc_callback,
+};
+
 struct adc_sequence sequence = {
+	.options = &options,
 	/* individual channels will be added below */
 	.channels    = 0,
 	.buffer      = sample_buffer,
@@ -61,10 +50,31 @@ struct adc_sequence sequence = {
 	.resolution  = ADC_RESOLUTION,
 };
 
+enum adc_action adc_callback(const struct device *dev,
+						 const struct adc_sequence *sequence,
+						 uint16_t sampling_index) {
+
+		for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++) {
+			uint16_t raw_value = ((uint16_t *)sequence->buffer)[i];
+
+				/*
+				 * Convert raw reading to millivolts if driver
+				 * supports reading of ADC reference voltage
+				 */
+				int32_t mv_value = raw_value;
+
+				adc_raw_to_millivolts(adc_ref_internal(dev), ADC_GAIN,
+					ADC_RESOLUTION, &mv_value);
+				LOG_ERR("ADC ch%d reading %d mV", i, mv_value);
+		}
+
+	return ADC_ACTION_FINISH;
+}
+
 void main(void)
 {
 	int err;
-	const struct device *dev_adc = DEVICE_DT_GET(ADC_NODE);
+	const struct device *dev_adc = device_get_binding(DT_LABEL(DT_NODELABEL(adc1)));
 
 	if (!device_is_ready(dev_adc)) {
 		printk("ADC device not found\n");
@@ -86,37 +96,18 @@ void main(void)
 		sequence.channels |= BIT(channel_ids[i]);
 	}
 
-	int32_t adc_vref = adc_ref_internal(dev_adc);
-
-	while (1) {
 		/*
 		 * Read sequence of channels (fails if not supported by MCU)
 		 */
+	while (1) {
+
+		/* printk("sample_buffer 0x%X\n", sample_buffer); */
 		err = adc_read(dev_adc, &sequence);
 		if (err != 0) {
 			printk("ADC reading failed with error %d.\n", err);
-			return;
 		}
-
-		printk("ADC reading:");
-		for (uint8_t i = 0; i < ADC_NUM_CHANNELS; i++) {
-			int32_t raw_value = sample_buffer[i];
-
-			printk(" %d", raw_value);
-			if (adc_vref > 0) {
-				/*
-				 * Convert raw reading to millivolts if driver
-				 * supports reading of ADC reference voltage
-				 */
-				int32_t mv_value = raw_value;
-
-				adc_raw_to_millivolts(adc_vref, ADC_GAIN,
-					ADC_RESOLUTION, &mv_value);
-				printk(" = %d mV  ", mv_value);
-			}
-		}
-		printk("\n");
 
 		k_sleep(K_MSEC(1000));
+		/* break; */
 	}
 }

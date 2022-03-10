@@ -4,7 +4,7 @@ tests:
   sample.drivers.adc:
     tags: ADC
     depends_on: adc
-    platform_allow: nucleo_l073rz disco_l475_iot1 cc3220sf_launchxl
+    platform_allow: nucleo_l073rz nucleo_h732rz disco_l475_iot1 cc3220sf_launchxl
         cc3235sf_launchxl
     harness: console
     timeout: 10

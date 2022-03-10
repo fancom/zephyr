@@ -85,6 +85,8 @@ void (*func_ll_clear_rgo[])(DMAMUX_Channel_TypeDef *DMAMUXx) = {
 int dmamux_stm32_configure(const struct device *dev, uint32_t id,
 				struct dma_config *config)
 {
+	LOG_DBG("dmamux_stm32_configure");
+	
 	/* device is the dmamux, id is the dmamux channel from 0 */
 	const struct dmamux_stm32_config *dev_config = dev->config;
 
@@ -93,6 +95,7 @@ int dmamux_stm32_configure(const struct device *dev, uint32_t id,
 	 * in the dma_slot parameter
 	 */
 	int request_id = config->dma_slot;
+	LOG_DBG("\t request_id %d", request_id);
 
 	if (request_id > dev_config->req_nb + dev_config->gen_nb) {
 		LOG_ERR("request ID %d is not valid.", request_id);
@@ -212,6 +215,10 @@ int dmamux_stm32_get_status(const struct device *dev, uint32_t id,
 
 static int dmamux_stm32_init(const struct device *dev)
 {
+	// This is called, but it doesn't print. It's
+	// probably because logging is setup after dma
+	LOG_ERR("dmamux_stm32_init");
+
 #if DT_INST_NODE_HAS_PROP(0, clocks)
 	const struct dmamux_stm32_config *config = dev->config;
 	const struct device *clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);

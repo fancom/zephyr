@@ -1,0 +1,22 @@
+
+
+&adc1{
+	/* The <channel> doesn't depend on peripheral */
+	/* The <slot> is the request line, so maybe adc1_dma? */
+	/* DIR = Peripheral to Memory
+	 * Increment peripheral address
+	 * Data size: 16 bits
+	 * <Feature> should NOT be used, but it's the threshold, 
+	 * because Zephyr is not handling dmamux correctly. Force to quarter
+	 */
+	dmas = <&dmamux1 0 9 0x2C80 0>;
+    dma-names = "dmamux";
+};
+
+&dma1{
+	status = "okay";
+};
+
+&dmamux1{
+	status = "okay";
+};
