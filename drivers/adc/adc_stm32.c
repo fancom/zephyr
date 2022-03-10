@@ -214,8 +214,9 @@ static const uint32_t table_samp_time[] = {
 #endif
 
 /* External channels (maximum). */
-#define STM32_CHANNEL_COUNT					20
+#define STM32_CHANNEL_COUNT		20
 #define STM32_ADC_SEQUENCE_MAX_LEN	16
+#define STM32_CACHE_GRANULARITY		32
 
 #ifdef CONFIG_ADC_STM32_DMA
 struct stream {
@@ -246,8 +247,7 @@ struct adc_stm32_data {
 #endif
 
 #ifdef CONFIG_ADC_STM32_DMA
-	struct k_sem status_sem;
-	volatile uint32_t status_flags;
+	volatile int dma_error;
 	struct stream dma;
 #endif
 };
@@ -267,21 +267,20 @@ static void dma_callback(const struct device *dev, void *arg,
 	/* arg directly holds the adc device */
 	struct adc_stm32_data *data = arg;
 
-	/* Read the ADC after DMA says it's done */
-	struct device *adc_dev = (ADC_TypeDef *)data->dev;
-	const struct adc_stm32_cfg *config = adc_dev->config;
-	ADC_TypeDef *adc = (ADC_TypeDef *)config->base;
-
-	SCB_InvalidateDCache_by_Addr(data->buffer, sizeof(uint16_t) * data->channel_count);
-	SCB_InvalidateDCache_by_Addr(data->repeat_buffer, sizeof(uint16_t) * data->channel_count);
-
-	adc_context_on_sampling_done(&data->ctx, dev);
+	if (channel == data->dma.channel) {
+		if (status != 0) {
+			LOG_ERR("DMA callback error with channel %d.", channel);
+			data->dma_error = status;
+		} else {
+			data->samples_count = data->channel_count;
+		}
+		adc_context_on_sampling_done(&data->ctx, dev);
+	}
 }
 
-/* Setup DMA for single or multiple read */
-/* Could probably be done once, but the length will change depending on sequence */
 static int adc_stm32_dma_start(const struct device *dev,
-				const struct adc_sequence *sequence){
+			       const struct adc_sequence *sequence)
+{
 	const struct adc_stm32_cfg *config = dev->config;
 	ADC_TypeDef *adc = (ADC_TypeDef *)config->base;
 	struct adc_stm32_data *data = dev->data;
@@ -297,11 +296,13 @@ static int adc_stm32_dma_start(const struct device *dev,
 	blk_cfg->block_size = sequence->buffer_size;
 
 	/* Source and destination */
-
 	blk_cfg->source_address = (uint32_t)LL_ADC_DMA_GetRegAddr(adc, LL_ADC_DMA_REG_REGULAR_DATA);
 	blk_cfg->source_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
+	blk_cfg->source_reload_en = 1;
+
 	blk_cfg->dest_address = (uint32_t)sequence->buffer;
 	blk_cfg->dest_addr_adj = DMA_ADDR_ADJ_INCREMENT;
+	blk_cfg->dest_reload_en = 1;
 
 	/* give the fifo mode from the DT */
 	blk_cfg->fifo_mode_control = data->dma.fifo_threshold;
@@ -311,15 +312,19 @@ static int adc_stm32_dma_start(const struct device *dev,
 	stream->dma_cfg.user_data = data;
 
 	/* pass our client origin to the dma: data->dma.channel */
-	LOG_DBG("Ready to do config");
 	ret = dma_config(data->dma.dma_dev, data->dma.channel,
-			&stream->dma_cfg);
+			 &stream->dma_cfg);
 
 	/* the channel is the actual stream from 0 */
 	if (ret != 0) {
 		LOG_ERR("Problem setting up DMA %d", ret);
 		return ret;
 	}
+
+	/* invalidate cache to make sure to get the adc data*/
+	/* Note: Buffer address must to be 32 bytes aligned using __aligned(32) */
+	SCB_InvalidateDCache_by_Addr(sequence->buffer,
+		(sequence->buffer_size + STM32_CACHE_GRANULARITY) & ~(STM32_CACHE_GRANULARITY));
 
 	ret = dma_start(data->dma.dma_dev, data->dma.channel);
 	if (ret != 0) {
@@ -330,19 +335,16 @@ static int adc_stm32_dma_start(const struct device *dev,
 	/* Allow ADC to create DMA request */
 	/* Copied from the HAL ADC drivers */
 #if defined(ADC_VER_V5_V90)
-	if (adc == ADC3)
-	{
-		LL_ADC_REG_SetDMATransferMode(adc, LL_ADC_REG_DMA_TRANSFER_LIMITED <<  ADC3_CFGR_DMACFG_Pos);
+	if (adc == ADC3) {
+		LL_ADC_REG_SetDMATransferMode(adc,
+			LL_ADC_REG_DMA_TRANSFER_LIMITED <<  ADC3_CFGR_DMACFG_Pos);
 		LL_ADC_EnableDMAReq(adc);
-	} else
-	{
+	} else {
 		LL_ADC_REG_SetDataTransferMode(adc, LL_ADC_REG_DMA_TRANSFER_LIMITED);
 	}
 #else
 	LL_ADC_REG_SetDataTransferMode(adc, LL_ADC_REG_DMA_TRANSFER_LIMITED);
 #endif
-
-	LOG_DBG("DMA Configured");
 
 	return ret;
 }
@@ -427,7 +429,7 @@ static void adc_stm32_wait_until_enabled(const ADC_TypeDef *adc)
 			LL_ADC_Enable(adc);
 			countTimeout++;
 			if (countTimeout == 10) {
-				return -ETIMEDOUT;
+				return; /* -ETIMEDOUT */
 			}
 		}
 	}
@@ -591,8 +593,7 @@ static int start_read(const struct device *dev,
 	data->samples_count = 0;
 
 	for (uint8_t chSel = 0; chSel < STM32_CHANNEL_COUNT; chSel++) {
-		if (sequence->channels & (1 << chSel)) {
-			LOG_DBG("Selected ADC channel %d", chSel);
+		if (sequence->channels & BIT(chSel)) {
 			uint32_t channel = __LL_ADC_DECIMAL_NB_TO_CHANNEL(chSel);
 
 #if defined(CONFIG_SOC_SERIES_STM32H7X)
@@ -600,14 +601,14 @@ static int start_read(const struct device *dev,
 	 * Each channel in the sequence must be previously enabled in PCSEL.
 	 * This register controls the analog switch integrated in the IO level.
 	 */
-			LL_ADC_SetChannelPreSelection(adc, channel);
+	LL_ADC_SetChannelPreSelection(adc, channel);
 #endif
 
 #if defined(CONFIG_SOC_SERIES_STM32F0X) || \
 	defined(CONFIG_SOC_SERIES_STM32L0X)
 			LL_ADC_REG_SetSequencerChannels(adc, channel);
 #elif defined(CONFIG_SOC_SERIES_STM32G0X)
-	*STM32G0 in "not fully configurable" sequencer mode * /
+	/* STM32G0 in "not fully configurable" sequencer mode */
 			LL_ADC_REG_SetSequencerChannels(adc, channel);
 			while (LL_ADC_IsActiveFlag_CCRDY(adc) == 0) {
 			}
@@ -620,7 +621,13 @@ static int start_read(const struct device *dev,
 			}
 		}
 	}
-	LL_ADC_REG_SetSequencerLength(adc, table_seq_len[data->channel_count]);
+
+	if (data->channel_count == 0) {
+		LOG_ERR("No channels selected");
+		return -EINVAL;
+	}
+
+	LL_ADC_REG_SetSequencerLength(adc, table_seq_len[data->channel_count - 1]);
 
 	err = check_buffer_size(sequence, data->channel_count);
 	if (err) {
@@ -736,13 +743,20 @@ static int start_read(const struct device *dev,
 #endif
 
 #ifdef CONFIG_ADC_STM32_DMA
-	/* Turn on DMA before starting read */
+	data->dma_error = 0;
 	adc_stm32_dma_start(dev, sequence);
 #endif
 
 	adc_context_start_read(&data->ctx, sequence);
 
-	return adc_context_wait_for_completion(&data->ctx);
+	int result = adc_context_wait_for_completion(&data->ctx);
+
+#ifdef CONFIG_ADC_STM32_DMA
+	dma_stop(data->dma.dma_dev, data->dma.channel);
+	result = (data->dma_error ? data->dma_error : result);
+#endif
+
+	return result;
 }
 
 static void adc_context_start_sampling(struct adc_context *ctx)
@@ -773,8 +787,8 @@ static void adc_stm32_isr(const struct device *dev)
 		(const struct adc_stm32_cfg *)dev->config;
 	ADC_TypeDef *adc = config->base;
 
-	data->buffer[data->samples_count++] = LL_ADC_REG_ReadConversionData32(adc);
-
+	*data->buffer++ = LL_ADC_REG_ReadConversionData32(adc);
+	data->samples_count++;
 	if (data->samples_count == data->channel_count) {
 		adc_context_on_sampling_done(&data->ctx, dev);
 	}
@@ -787,8 +801,6 @@ static int adc_stm32_read(const struct device *dev,
 {
 	struct adc_stm32_data *data = dev->data;
 	int error;
-
-	LOG_DBG("adc_stm32_read");
 
 	adc_context_lock(&data->ctx, false, NULL);
 	error = start_read(dev, sequence);
@@ -873,7 +885,7 @@ static int adc_stm32_channel_setup(const struct device *dev,
 {
 #if defined(CONFIG_SOC_SERIES_STM32F0X) || \
 	defined(CONFIG_SOC_SERIES_STM32G0X) || \
-	 defined(CONFIG_SOC_SERIES_STM32L0X)
+	defined(CONFIG_SOC_SERIES_STM32L0X)
 	struct adc_stm32_data *data = dev->data;
 #endif
 	int acq_time_index;
@@ -883,8 +895,7 @@ static int adc_stm32_channel_setup(const struct device *dev,
 		return -EINVAL;
 	}
 
-	acq_time_index = adc_stm32_check_acq_time(
-				channel_cfg->acquisition_time);
+	acq_time_index = adc_stm32_check_acq_time(channel_cfg->acquisition_time);
 	if (acq_time_index < 0) {
 		return acq_time_index;
 	}
@@ -921,10 +932,9 @@ static int adc_stm32_channel_setup(const struct device *dev,
 		adc_stm32_set_common_path(dev);
 	}
 
-	adc_stm32_setup_speed(dev, channel_cfg->channel_id,
-				  acq_time_index);
+	adc_stm32_setup_speed(dev, channel_cfg->channel_id, acq_time_index);
 
-	LOG_DBG("Channel setup succeeded!");
+	LOG_DBG("Channel %d setup succeeded!", channel_cfg->channel_id);
 
 	return 0;
 }
@@ -969,7 +979,7 @@ static int adc_stm32_init(const struct device *dev)
 
 #ifdef CONFIG_ADC_STM32_DMA
 	if ((data->dma.dma_dev != NULL) &&
-				!device_is_ready(data->dma.dma_dev)) {
+	    !device_is_ready(data->dma.dma_dev)) {
 		LOG_ERR("%s device not ready", data->dma.dma_dev->name);
 		return -ENODEV;
 	}
@@ -1071,127 +1081,93 @@ static const struct adc_driver_api api_stm32_driver_api = {
 #endif
 };
 
-
 #ifdef CONFIG_ADC_STM32_DMA
 
-#define DMA_CHANNEL_CONFIG(id, name)					\
-		DT_INST_DMAS_CELL_BY_NAME(id, name, channel_config)
-#define DMA_FEATURES(id, name)						\
-		DT_INST_DMAS_CELL_BY_NAME(id, name, features)
-#define DMA_CTLR(id, name)						\
-		DT_INST_DMAS_CTLR_BY_NAME(id, name)
+#define DMA_CHANNEL_CONFIG(id, name) \
+	DT_INST_DMAS_CELL_BY_NAME(id, name, channel_config)
+#define DMA_FEATURES(id, name) \
+	DT_INST_DMAS_CELL_BY_NAME(id, name, features)
+#define DMA_CTLR(id, name) \
+	DT_INST_DMAS_CTLR_BY_NAME(id, name)
 
-#define ADC_DMA_CHANNEL_INIT(index, name, dir_cap, src_dev, dest_dev)	\
-	.dma = {	\
-		.dma_dev = DEVICE_DT_GET(DMA_CTLR(index, name)),			\
-		.channel = DT_INST_DMAS_CELL_BY_NAME(index, name, channel),	\
-		.dma_cfg = {							\
-			.dma_slot = DT_INST_DMAS_CELL_BY_NAME(index, name, slot),\
-			.channel_direction = STM32_DMA_CONFIG_DIRECTION(	\
-						DMA_CHANNEL_CONFIG(index, name)),       \
-			.source_data_size = STM32_DMA_CONFIG_##src_dev##_DATA_SIZE(    \
-						DMA_CHANNEL_CONFIG(index, name)),       \
-			.dest_data_size = STM32_DMA_CONFIG_##dest_dev##_DATA_SIZE(     \
-					DMA_CHANNEL_CONFIG(index, name)),	\
-			.source_burst_length = 1, /* SINGLE transfer */		\
-			.dest_burst_length = 1, /* SINGLE transfer */		\
-			.channel_priority = STM32_DMA_CONFIG_PRIORITY(		\
-						DMA_CHANNEL_CONFIG(index, name)),\
-			.dma_callback = dma_callback,				\
-			.block_count = 2,					\
-		},								\
-		. src_addr_increment = STM32_DMA_CONFIG_##src_dev##_ADDR_INC(	\
-					DMA_CHANNEL_CONFIG(index, name)),	\
-		.dst_addr_increment = STM32_DMA_CONFIG_##dest_dev##_ADDR_INC(	\
-					DMA_CHANNEL_CONFIG(index, name)),	\
-		.fifo_threshold = STM32_DMA_FEATURES_FIFO_THRESHOLD(		\
-					DMA_FEATURES(index, name)),		\
+#define ADC_DMA_CHANNEL_INIT(index, name, dir_cap, src_dev, dest_dev)		    \
+	.dma = {								    \
+		.dma_dev = DEVICE_DT_GET(DMA_CTLR(index, name)),		    \
+		.channel = DT_INST_DMAS_CELL_BY_NAME(index, name, channel),	    \
+		.dma_cfg = {							    \
+			.dma_slot = DT_INST_DMAS_CELL_BY_NAME(index, name, slot),   \
+			.channel_direction = STM32_DMA_CONFIG_DIRECTION(	    \
+				DMA_CHANNEL_CONFIG(index, name)),		    \
+			.source_data_size = STM32_DMA_CONFIG_##src_dev##_DATA_SIZE( \
+				DMA_CHANNEL_CONFIG(index, name)),		    \
+			.dest_data_size = STM32_DMA_CONFIG_##dest_dev##_DATA_SIZE(  \
+				DMA_CHANNEL_CONFIG(index, name)),		    \
+			.source_burst_length = 1,       /* SINGLE transfer */	    \
+			.dest_burst_length = 1,         /* SINGLE transfer */	    \
+			.channel_priority = STM32_DMA_CONFIG_PRIORITY(		    \
+				DMA_CHANNEL_CONFIG(index, name)),		    \
+			.dma_callback = dma_callback,				    \
+			.block_count = 2,					    \
+		},								    \
+		.src_addr_increment = STM32_DMA_CONFIG_##src_dev##_ADDR_INC(	    \
+			DMA_CHANNEL_CONFIG(index, name)),			    \
+		.dst_addr_increment = STM32_DMA_CONFIG_##dest_dev##_ADDR_INC(	    \
+			DMA_CHANNEL_CONFIG(index, name)),			    \
+		.fifo_threshold = STM32_DMA_FEATURES_FIFO_THRESHOLD(		    \
+			DMA_FEATURES(index, name)),				    \
 	}
 
-#define ADC_DMA_CHANNEL(id, dir, DIR, src, dest)			\
-	COND_CODE_1(DT_INST_DMAS_HAS_NAME(id, dir),		\
-		(ADC_DMA_CHANNEL_INIT(id, dir, DIR, src, dest)),\
-		(NULL))						\
+#define ADC_DMA_CHANNEL(id, dir, DIR, src, dest)		     \
+	COND_CODE_1(DT_INST_DMAS_HAS_NAME(id, dir),		     \
+		    (ADC_DMA_CHANNEL_INIT(id, dir, DIR, src, dest)), \
+		    (NULL))					     \
+
+#define IRQ_SET_STATE irq_disable
+
+#else
+
+#define IRQ_SET_STATE irq_enable
+#define ADC_DMA_CHANNEL_INIT(index, dmamux, NULL, PERIPHERAL, MEMORY)
+
+#endif
 
 
-#define STM32_ADC_INIT(index)						\
-									\
-static void adc_stm32_cfg_func_##index(void);				\
-									\
-static const struct soc_gpio_pinctrl adc_pins_##index[] =		\
-	ST_STM32_DT_INST_PINCTRL(index, 0);				\
-									\
-static const struct adc_stm32_cfg adc_stm32_cfg_##index = {		\
-	.base = (ADC_TypeDef *)DT_INST_REG_ADDR(index),			\
-	.irq_cfg_func = adc_stm32_cfg_func_##index,			\
-	.pclken = {							\
-		.enr = DT_INST_CLOCKS_CELL(index, bits),		\
-		.bus = DT_INST_CLOCKS_CELL(index, bus),			\
-	},								\
-	.pinctrl = adc_pins_##index,					\
-	.pinctrl_len = ARRAY_SIZE(adc_pins_##index),			\
-};									\
-static struct adc_stm32_data adc_stm32_data_##index = {			\
-	ADC_CONTEXT_INIT_TIMER(adc_stm32_data_##index, ctx),		\
-	ADC_CONTEXT_INIT_LOCK(adc_stm32_data_##index, ctx),		\
-	ADC_CONTEXT_INIT_SYNC(adc_stm32_data_##index, ctx),		\
-	ADC_DMA_CHANNEL_INIT(index, dmamux, NULL, PERIPHERAL, MEMORY)			\
-};									\
-									\
-DEVICE_DT_INST_DEFINE(index,						\
-		    &adc_stm32_init, NULL,				\
-		    &adc_stm32_data_##index, &adc_stm32_cfg_##index,	\
-		    POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT,	\
-		    &api_stm32_driver_api);				\
-									\
-static void adc_stm32_cfg_func_##index(void)				\
-{									\
-	IRQ_CONNECT(DT_INST_IRQN(index),				\
-		    DT_INST_IRQ(index, priority),			\
-		    adc_stm32_isr, DEVICE_DT_INST_GET(index), 0);	\
-	/* DONT ENABLE WHEN USING DMA */		\
-	irq_disable(DT_INST_IRQN(index));				\
-}
-
-#else /* CONFIG_ADC_STM32_DMA */
-
-#define STM32_ADC_INIT(index)						\
-									\
-static void adc_stm32_cfg_func_##index(void);				\
-									\
-static const struct soc_gpio_pinctrl adc_pins_##index[] =		\
-	ST_STM32_DT_INST_PINCTRL(index, 0);				\
-									\
-static const struct adc_stm32_cfg adc_stm32_cfg_##index = {		\
-	.base = (ADC_TypeDef *)DT_INST_REG_ADDR(index),			\
-	.irq_cfg_func = adc_stm32_cfg_func_##index,			\
-	.pclken = {							\
-		.enr = DT_INST_CLOCKS_CELL(index, bits),		\
-		.bus = DT_INST_CLOCKS_CELL(index, bus),			\
-	},								\
-	.pinctrl = adc_pins_##index,					\
-	.pinctrl_len = ARRAY_SIZE(adc_pins_##index),			\
-};									\
-static struct adc_stm32_data adc_stm32_data_##index = {			\
-	ADC_CONTEXT_INIT_TIMER(adc_stm32_data_##index, ctx),		\
-	ADC_CONTEXT_INIT_LOCK(adc_stm32_data_##index, ctx),		\
-	ADC_CONTEXT_INIT_SYNC(adc_stm32_data_##index, ctx),		\
-};									\
-									\
-DEVICE_DT_INST_DEFINE(index,						\
-		    &adc_stm32_init, NULL,				\
-		    &adc_stm32_data_##index, &adc_stm32_cfg_##index,	\
-		    POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT,	\
-		    &api_stm32_driver_api);				\
-									\
-static void adc_stm32_cfg_func_##index(void)				\
-{									\
-	IRQ_CONNECT(DT_INST_IRQN(index),				\
-		    DT_INST_IRQ(index, priority),			\
-		    adc_stm32_isr, DEVICE_DT_INST_GET(index), 0);	\
-	irq_enable(DT_INST_IRQN(index));				\
-}
-
-#endif /* CONFIG_ADC_STM32_DMA */
+#define STM32_ADC_INIT(index)							\
+										\
+	static void adc_stm32_cfg_func_##index(void);				\
+										\
+	static const struct soc_gpio_pinctrl adc_pins_##index[] =		\
+		ST_STM32_DT_INST_PINCTRL(index, 0);				\
+										\
+	static const struct adc_stm32_cfg adc_stm32_cfg_##index = {		\
+		.base = (ADC_TypeDef *)DT_INST_REG_ADDR(index),			\
+		.irq_cfg_func = adc_stm32_cfg_func_##index,			\
+		.pclken = {							\
+			.enr = DT_INST_CLOCKS_CELL(index, bits),		\
+			.bus = DT_INST_CLOCKS_CELL(index, bus),			\
+		},								\
+		.pinctrl = adc_pins_##index,					\
+		.pinctrl_len = ARRAY_SIZE(adc_pins_##index),			\
+	};									\
+	static struct adc_stm32_data adc_stm32_data_##index = {			\
+		ADC_CONTEXT_INIT_TIMER(adc_stm32_data_##index, ctx),		\
+		ADC_CONTEXT_INIT_LOCK(adc_stm32_data_##index, ctx),		\
+		ADC_CONTEXT_INIT_SYNC(adc_stm32_data_##index, ctx),		\
+		ADC_DMA_CHANNEL_INIT(index, dmamux, NULL, PERIPHERAL, MEMORY)	\
+	};									\
+										\
+	DEVICE_DT_INST_DEFINE(index,						\
+			      &adc_stm32_init, NULL,				\
+			      &adc_stm32_data_##index, &adc_stm32_cfg_##index,	\
+			      POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT,	\
+			      &api_stm32_driver_api);				\
+										\
+	static void adc_stm32_cfg_func_##index(void)				\
+	{									\
+		IRQ_CONNECT(DT_INST_IRQN(index),				\
+			    DT_INST_IRQ(index, priority),			\
+			    adc_stm32_isr, DEVICE_DT_INST_GET(index), 0);	\
+		IRQ_SET_STATE(DT_INST_IRQN(index));				\
+	}
 
 DT_INST_FOREACH_STATUS_OKAY(STM32_ADC_INIT)

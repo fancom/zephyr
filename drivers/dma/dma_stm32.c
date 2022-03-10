@@ -87,8 +87,6 @@ static void dma_stm32_irq_handler(const struct device *dev, uint32_t id)
 	struct dma_stm32_stream *stream;
 	uint32_t callback_arg;
 
-	LOG_DBG("dma_stm32_irq_handler");
-
 	__ASSERT_NO_MSG(id < config->max_streams);
 
 	stream = &config->streams[id];
@@ -268,8 +266,6 @@ DMA_STM32_EXPORT_API int dma_stm32_configure(const struct device *dev,
 	LL_DMA_InitTypeDef DMA_InitStruct;
 	int ret;
 
-	LOG_DBG("dma_stm32_configure");
-
 	/* give channel from index 0 */
 	id = id - STREAM_OFFSET;
 
@@ -323,7 +319,6 @@ DMA_STM32_EXPORT_API int dma_stm32_configure(const struct device *dev,
 		LOG_ERR("source and dest data size differ.");
 		return -EINVAL;
 	}
-	LOG_DBG("\t dest_data_size %d", config->dest_data_size);
 
 	if (config->source_data_size != 4U &&
 	    config->source_data_size != 2U &&
@@ -332,8 +327,6 @@ DMA_STM32_EXPORT_API int dma_stm32_configure(const struct device *dev,
 			config->source_data_size);
 		return -EINVAL;
 	}
-
-	LOG_DBG("\t source_data_size %d", config->source_data_size);
 
 	/*
 	 * STM32's circular mode will auto reset both source address
@@ -357,12 +350,10 @@ DMA_STM32_EXPORT_API int dma_stm32_configure(const struct device *dev,
 	if ((config->head_block->source_address == 0)) {
 		LOG_WRN("source_buffer address is null.");
 	}
-	LOG_DBG("\t source_address 0x%X", config->head_block->source_address);
 
 	if ((config->head_block->dest_address == 0)) {
 		LOG_WRN("dest_buffer address is null.");
 	}
-	LOG_DBG("\t dest_buffer 0x%X", config->head_block->dest_address);
 
 	if (stream->direction == MEMORY_TO_PERIPHERAL) {
 		DMA_InitStruct.MemoryOrM2MDstAddress =
@@ -393,12 +384,10 @@ DMA_STM32_EXPORT_API int dma_stm32_configure(const struct device *dev,
 	switch (config->channel_direction) {
 	case MEMORY_TO_MEMORY:
 	case PERIPHERAL_TO_MEMORY:
-		LOG_DBG("\tdirection:  PERIPHERAL_TO_MEMORY");
 		memory_addr_adj = config->head_block->dest_addr_adj;
 		periph_addr_adj = config->head_block->source_addr_adj;
 		break;
 	case MEMORY_TO_PERIPHERAL:
-		LOG_DBG("\tdirection:  MEMORY_TO_PERIPHERAL");
 		memory_addr_adj = config->head_block->source_addr_adj;
 		periph_addr_adj = config->head_block->dest_addr_adj;
 		break;
@@ -430,20 +419,7 @@ DMA_STM32_EXPORT_API int dma_stm32_configure(const struct device *dev,
 
 	/* set the data width, when source_data_size equals dest_data_size */
 	int index = find_lsb_set(config->source_data_size) - 1;
-	DMA_InitStruct.PeriphOrM2MSrcDataSize = table_p_size[index];	
-	switch(DMA_InitStruct.PeriphOrM2MSrcDataSize){
-		case LL_DMA_PDATAALIGN_BYTE:
-			LOG_DBG("\tPeriphOrM2MSrcDataSize LL_DMA_PDATAALIGN_BYTE");
-			break;
-		case LL_DMA_PDATAALIGN_HALFWORD:
-			LOG_DBG("\tPeriphOrM2MSrcDataSize LL_DMA_PDATAALIGN_HALFWORD");
-			break;
-		case LL_DMA_PDATAALIGN_WORD:
-			LOG_DBG("\tPeriphOrM2MSrcDataSize LL_DMA_PDATAALIGN_WORD");
-			break;
-		default:
-			LOG_DBG("\tPeriphOrM2MSrcDataSize OOPS");
-	}
+	DMA_InitStruct.PeriphOrM2MSrcDataSize = table_p_size[index];
 	index = find_lsb_set(config->dest_data_size) - 1;
 	DMA_InitStruct.MemoryOrM2MDstDataSize = table_m_size[index];
 
@@ -471,7 +447,6 @@ DMA_STM32_EXPORT_API int dma_stm32_configure(const struct device *dev,
 
 	DMA_InitStruct.FIFOThreshold = stm32_dma_get_fifo_threshold(
 					config->head_block->fifo_mode_control);
-	LOG_DBG("\t DMA_InitStruct.FIFOThreshold %d", DMA_InitStruct.FIFOThreshold);
 
 	if (stm32_dma_check_fifo_mburst(&DMA_InitStruct)) {
 		DMA_InitStruct.FIFOMode = LL_DMA_FIFOMODE_ENABLE;
@@ -618,9 +593,6 @@ static int dma_stm32_init(const struct device *dev)
 {
 	const struct dma_stm32_config *config = dev->config;
 	const struct device *clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
-
-	// This isn't called because dmamux is the master
-	LOG_ERR("dma_stm32_init");
 
 	if (clock_control_on(clk,
 		(clock_control_subsys_t *) &config->pclken) != 0) {

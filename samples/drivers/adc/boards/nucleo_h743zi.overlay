@@ -1,22 +1,24 @@
-
-
-&adc1{
-	/* The <channel> doesn't depend on peripheral */
-	/* The <slot> is the request line, so maybe adc1_dma? */
-	/* DIR = Peripheral to Memory
-	 * Increment peripheral address
-	 * Data size: 16 bits
-	 * <Feature> should NOT be used, but it's the threshold, 
-	 * because Zephyr is not handling dmamux correctly. Force to quarter
-	 */
-	dmas = <&dmamux1 0 9 0x2C80 0>;
-    dma-names = "dmamux";
+/ {
+	zephyr,user {
+		/*
+		 * Note: Data in ADC results buffer will not be in the order
+		 * that they are defined here, but as channels selection is done
+		 * by a bitmask, they will be sorted instead in a way that
+		 * lowest channel number result is on lowest buffer address
+		 */
+		io-channels = <&adc1 1>, <&adc1 2>;
+	};
 };
 
-&dma1{
+&adc1 {
+	dmas = < &dmamux1 0 9 0x2C80 0 >;
+	dma-names = "dmamux";
+};
+
+&dma1 {
 	status = "okay";
 };
 
-&dmamux1{
+&dmamux1 {
 	status = "okay";
 };
