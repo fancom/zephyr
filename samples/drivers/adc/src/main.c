@@ -41,7 +41,7 @@ static uint8_t channel_ids[ADC_NUM_CHANNELS] = {
 #endif
 };
 
-static int16_t sample_buffer[ADC_NUM_CHANNELS];
+static int16_t sample_buffer[ADC_NUM_CHANNELS] __aligned(32);
 
 struct adc_channel_cfg channel_cfg = {
 	.gain = ADC_GAIN,

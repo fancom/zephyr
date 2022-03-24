@@ -1,0 +1,24 @@
+/ {
+	zephyr,user {
+		/*
+		 * Note: Data in ADC results buffer will not be in the order
+		 * that they are defined here, but as channels selection is done
+		 * by a bitmask, they will be sorted instead in a way that
+		 * lowest channel number result is on lowest buffer address
+		 */
+		io-channels = <&adc1 1>, <&adc1 2>;
+	};
+};
+
+&adc1 {
+	dmas = < &dmamux1 0 9 0x2C80 0 >;
+	dma-names = "dmamux";
+};
+
+&dma1 {
+	status = "okay";
+};
+
+&dmamux1 {
+	status = "okay";
+};
