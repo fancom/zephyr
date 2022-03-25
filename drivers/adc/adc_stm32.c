@@ -247,6 +247,7 @@ struct adc_stm32_data {
 #endif
 
 #ifdef CONFIG_ADC_STM32_DMA
+	size_t buffer_size;
 	volatile int dma_error;
 	struct stream dma;
 #endif
@@ -274,12 +275,19 @@ static void dma_callback(const struct device *dev, void *arg,
 		} else {
 			data->samples_count = data->channel_count;
 		}
+
+		/* Stop the DMA engine, only to start it again when the callback returns
+		   ADC_ACTION_REPEAT or ADC_ACTION_CONTINUE and the number of samples haven't been reached
+		   Starting the DMA engine is done witthin adc_context_start_sampling
+		*/
+
+		dma_stop(data->dma.dma_dev, data->dma.channel);
 		adc_context_on_sampling_done(&data->ctx, dev);
 	}
 }
 
 static int adc_stm32_dma_start(const struct device *dev,
-			       const struct adc_sequence *sequence)
+			       void *buffer, size_t buffer_size)
 {
 	const struct adc_stm32_cfg *config = dev->config;
 	ADC_TypeDef *adc = (ADC_TypeDef *)config->base;
@@ -293,14 +301,14 @@ static int adc_stm32_dma_start(const struct device *dev,
 
 	/* prepare the block */
 	memset(blk_cfg, 0, sizeof(struct dma_block_config));
-	blk_cfg->block_size = sequence->buffer_size;
+	blk_cfg->block_size = buffer_size;
 
 	/* Source and destination */
 	blk_cfg->source_address = (uint32_t)LL_ADC_DMA_GetRegAddr(adc, LL_ADC_DMA_REG_REGULAR_DATA);
 	blk_cfg->source_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
 	blk_cfg->source_reload_en = 1;
 
-	blk_cfg->dest_address = (uint32_t)sequence->buffer;
+	blk_cfg->dest_address = (uint32_t)buffer;
 	blk_cfg->dest_addr_adj = DMA_ADDR_ADJ_INCREMENT;
 	blk_cfg->dest_reload_en = 1;
 
@@ -323,8 +331,8 @@ static int adc_stm32_dma_start(const struct device *dev,
 
 	/* invalidate cache to make sure to get the adc data*/
 	/* Note: Buffer address must to be 32 bytes aligned using __aligned(32) */
-	SCB_InvalidateDCache_by_Addr(sequence->buffer,
-		(sequence->buffer_size + STM32_CACHE_GRANULARITY) & ~(STM32_CACHE_GRANULARITY));
+	SCB_InvalidateDCache_by_Addr(buffer,
+		(buffer_size + STM32_CACHE_GRANULARITY) & ~(STM32_CACHE_GRANULARITY));
 
 	ret = dma_start(data->dma.dma_dev, data->dma.channel);
 	if (ret != 0) {
@@ -589,6 +597,9 @@ static int start_read(const struct device *dev,
 	}
 
 	data->buffer = sequence->buffer;
+#ifdef CONFIG_ADC_STM32_DMA
+	data->buffer_size = sequence->buffer_size;
+#endif
 	data->channel_count = 0;
 	data->samples_count = 0;
 
@@ -735,28 +746,21 @@ static int start_read(const struct device *dev,
 	defined(CONFIG_SOC_SERIES_STM32G0X) || \
 	defined(CONFIG_SOC_SERIES_STM32G4X) || \
 	defined(CONFIG_SOC_SERIES_STM32H7X)
-	LL_ADC_EnableIT_EOC(adc);
+	if (data->channel_count > 1) {
+		LL_ADC_EnableIT_EOS(adc);
+	}
+	else {
+		LL_ADC_EnableIT_EOC(adc);
+	}
 #elif defined(CONFIG_SOC_SERIES_STM32F1X)
 	LL_ADC_EnableIT_EOS(adc);
 #else
 	LL_ADC_EnableIT_EOCS(adc);
 #endif
 
-#ifdef CONFIG_ADC_STM32_DMA
-	data->dma_error = 0;
-	adc_stm32_dma_start(dev, sequence);
-#endif
-
 	adc_context_start_read(&data->ctx, sequence);
 
-	int result = adc_context_wait_for_completion(&data->ctx);
-
-#ifdef CONFIG_ADC_STM32_DMA
-	dma_stop(data->dma.dma_dev, data->dma.channel);
-	result = (data->dma_error ? data->dma_error : result);
-#endif
-
-	return result;
+	return adc_context_wait_for_completion(&data->ctx);
 }
 
 static void adc_context_start_sampling(struct adc_context *ctx)
@@ -766,6 +770,10 @@ static void adc_context_start_sampling(struct adc_context *ctx)
 
 	data->repeat_buffer = data->buffer;
 
+#ifdef CONFIG_ADC_STM32_DMA
+	data->dma_error = 0;
+	adc_stm32_dma_start(data->dev, data->buffer, data->buffer_size);
+#endif
 	adc_stm32_start_conversion(data->dev);
 }
 
