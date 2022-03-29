@@ -277,9 +277,9 @@ static void dma_callback(const struct device *dev, void *arg,
 		}
 
 		/* Stop the DMA engine, only to start it again when the callback returns
-		   ADC_ACTION_REPEAT or ADC_ACTION_CONTINUE and the number of samples haven't been reached
-		   Starting the DMA engine is done witthin adc_context_start_sampling
-		*/
+		 *  ADC_ACTION_REPEAT or ADC_ACTION_CONTINUE and the number of samples haven't been reached
+		 *  Starting the DMA engine is done witthin adc_context_start_sampling
+		 */
 
 		dma_stop(data->dma.dma_dev, data->dma.channel);
 		adc_context_on_sampling_done(&data->ctx, dev);
@@ -748,8 +748,7 @@ static int start_read(const struct device *dev,
 	defined(CONFIG_SOC_SERIES_STM32H7X)
 	if (data->channel_count > 1) {
 		LL_ADC_EnableIT_EOS(adc);
-	}
-	else {
+	} else {
 		LL_ADC_EnableIT_EOC(adc);
 	}
 #elif defined(CONFIG_SOC_SERIES_STM32F1X)
@@ -763,7 +762,7 @@ static int start_read(const struct device *dev,
 	int result = adc_context_wait_for_completion(&data->ctx);
 
 #ifdef CONFIG_ADC_STM32_DMA
-	// check if there's anything wrong with dma start
+	/* check if there's anything wrong with dma start */
 	result = (data->dma_error ? data->dma_error : result);
 #endif
 
