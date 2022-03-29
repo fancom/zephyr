@@ -760,7 +760,14 @@ static int start_read(const struct device *dev,
 
 	adc_context_start_read(&data->ctx, sequence);
 
-	return adc_context_wait_for_completion(&data->ctx);
+	int result = adc_context_wait_for_completion(&data->ctx);
+
+#ifdef CONFIG_ADC_STM32_DMA
+	// check if there's anything wrong with dma start
+	result = (data->dma_error ? data->dma_error : result);
+#endif
+
+	return result;
 }
 
 static void adc_context_start_sampling(struct adc_context *ctx)
