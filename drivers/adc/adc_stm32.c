@@ -277,7 +277,8 @@ static void dma_callback(const struct device *dev, void *arg,
 		}
 
 		/* Stop the DMA engine, only to start it again when the callback returns
-		 *  ADC_ACTION_REPEAT or ADC_ACTION_CONTINUE and the number of samples haven't been reached
+		 *  ADC_ACTION_REPEAT or ADC_ACTION_CONTINUE
+		 *  and the number of samples haven't been reached
 		 *  Starting the DMA engine is done witthin adc_context_start_sampling
 		 */
 
