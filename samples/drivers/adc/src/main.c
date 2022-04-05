@@ -41,7 +41,12 @@ static uint8_t channel_ids[ADC_NUM_CHANNELS] = {
 #endif
 };
 
-static int16_t sample_buffer[ADC_NUM_CHANNELS] __aligned(32);
+#ifdef CONFIG_SOC_SERIES_STM32H7X
+__in_section(shared_sram1, adc1,
+	     dma_ds) static volatile int16_t sample_buffer[ADC_NUM_CHANNELS] __aligned(32);
+#else
+static volatile int16_t sample_buffer[ADC_NUM_CHANNELS] __aligned(32);
+#endif
 
 struct adc_channel_cfg channel_cfg = {
 	.gain = ADC_GAIN,

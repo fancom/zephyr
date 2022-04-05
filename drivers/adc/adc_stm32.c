@@ -276,12 +276,17 @@ static void dma_callback(const struct device *dev, void *arg,
 			data->samples_count = data->channel_count;
 		}
 
+		/* invalidate cache to make sure to get the adc data*/
+		/* Note: Buffer address must to be 32 bytes aligned using __aligned(32) */
+		SCB_InvalidateDCache_by_Addr(data->buffer,
+			(data->buffer_size + STM32_CACHE_GRANULARITY) & ~(STM32_CACHE_GRANULARITY));
+
+
 		/* Stop the DMA engine, only to start it again when the callback returns
 		 *  ADC_ACTION_REPEAT or ADC_ACTION_CONTINUE
 		 *  and the number of samples haven't been reached
 		 *  Starting the DMA engine is done witthin adc_context_start_sampling
 		 */
-
 		dma_stop(data->dma.dma_dev, data->dma.channel);
 		adc_context_on_sampling_done(&data->ctx, dev);
 	}
@@ -307,11 +312,11 @@ static int adc_stm32_dma_start(const struct device *dev,
 	/* Source and destination */
 	blk_cfg->source_address = (uint32_t)LL_ADC_DMA_GetRegAddr(adc, LL_ADC_DMA_REG_REGULAR_DATA);
 	blk_cfg->source_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
-	blk_cfg->source_reload_en = 1;
+	blk_cfg->source_reload_en = 0;
 
 	blk_cfg->dest_address = (uint32_t)buffer;
 	blk_cfg->dest_addr_adj = DMA_ADDR_ADJ_INCREMENT;
-	blk_cfg->dest_reload_en = 1;
+	blk_cfg->dest_reload_en = 0;
 
 	/* give the fifo mode from the DT */
 	blk_cfg->fifo_mode_control = data->dma.fifo_threshold;
@@ -330,30 +335,27 @@ static int adc_stm32_dma_start(const struct device *dev,
 		return ret;
 	}
 
-	/* invalidate cache to make sure to get the adc data*/
-	/* Note: Buffer address must to be 32 bytes aligned using __aligned(32) */
-	SCB_InvalidateDCache_by_Addr(buffer,
-		(buffer_size + STM32_CACHE_GRANULARITY) & ~(STM32_CACHE_GRANULARITY));
-
 	ret = dma_start(data->dma.dma_dev, data->dma.channel);
 	if (ret != 0) {
 		LOG_ERR("Problem starting DMA %d", ret);
 		return ret;
 	}
 
-	/* Allow ADC to create DMA request */
+	/* Allow ADC to create DMA request and set to one-shot mode */
 	/* Copied from the HAL ADC drivers */
 #if defined(ADC_VER_V5_V90)
 	if (adc == ADC3) {
 		LL_ADC_REG_SetDMATransferMode(adc,
-			LL_ADC_REG_DMA_TRANSFER_LIMITED <<  ADC3_CFGR_DMACFG_Pos);
+			ADC3_CFGR_DMACONTREQ(LL_ADC_REG_DMA_TRANSFER_LIMITED));
 		LL_ADC_EnableDMAReq(adc);
 	} else {
-		LL_ADC_REG_SetDataTransferMode(adc, LL_ADC_REG_DMA_TRANSFER_LIMITED);
+		LL_ADC_REG_SetDataTransferMode(adc,
+			ADC_CFGR_DMACONTREQ(LL_ADC_REG_DMA_TRANSFER_LIMITED));
 	}
 #else
 	LL_ADC_REG_SetDataTransferMode(adc, LL_ADC_REG_DMA_TRANSFER_LIMITED);
 #endif
+
 
 	return ret;
 }
