@@ -573,9 +573,9 @@ DMA_STM32_EXPORT_API int dma_stm32_stop(const struct device *dev, uint32_t id)
 		return -EINVAL;
 	}
 
-#if !defined(CONFIG_DMAMUX_STM32) || defined(CONFIG_SOC_SERIES_STM32H7X)
+	/* in dma_stm32_configure, enabling is done regardless of defines */
 	LL_DMA_DisableIT_TC(dma, dma_stm32_id_to_stream(id));
-#endif /* CONFIG_DMAMUX_STM32 */
+	LL_DMA_DisableIT_HT(dma, dma_stm32_id_to_stream(id));
 
 #if defined(CONFIG_DMA_STM32_V1)
 	stm32_dma_disable_fifo_irq(dma, id);

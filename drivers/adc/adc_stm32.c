@@ -262,33 +262,39 @@ struct adc_stm32_cfg {
 };
 
 #ifdef CONFIG_ADC_STM32_DMA
-static void dma_callback(const struct device *dev, void *arg,
+static void dma_callback(const struct device *dev, void *user_data,
 			 uint32_t channel, int status)
 {
-	/* arg directly holds the adc device */
-	struct adc_stm32_data *data = arg;
+	/* user_data directly holds the adc device */
+	struct adc_stm32_data *data = user_data;
+	const struct adc_stm32_cfg *config = dev->config;
+	ADC_TypeDef *adc = (ADC_TypeDef *)config->base;
+
+	LOG_DBG("dma_complete");
 
 	if (channel == data->dma.channel) {
-		if (status != 0) {
-			LOG_ERR("DMA callback error with channel %d.", channel);
-			data->dma_error = status;
-		} else {
-			data->samples_count = data->channel_count;
-		}
-
 		/* invalidate cache to make sure to get the adc data*/
 		/* Note: Buffer address must to be 32 bytes aligned using __aligned(32) */
 		SCB_InvalidateDCache_by_Addr(data->buffer,
 			(data->buffer_size + STM32_CACHE_GRANULARITY) & ~(STM32_CACHE_GRANULARITY));
 
-
-		/* Stop the DMA engine, only to start it again when the callback returns
-		 *  ADC_ACTION_REPEAT or ADC_ACTION_CONTINUE
-		 *  and the number of samples haven't been reached
-		 *  Starting the DMA engine is done witthin adc_context_start_sampling
-		 */
-		dma_stop(data->dma.dma_dev, data->dma.channel);
-		adc_context_on_sampling_done(&data->ctx, dev);
+		if (LL_ADC_IsActiveFlag_OVR(adc) || (status == 0)) {
+			data->samples_count = data->channel_count;
+			/* Stop the DMA engine, only to start it again when the callback returns
+			 *  ADC_ACTION_REPEAT or ADC_ACTION_CONTINUE
+			 *  and the number of samples haven't been reached
+			 *  Starting the DMA engine is done within adc_context_start_sampling
+			 */
+			dma_stop(data->dma.dma_dev, data->dma.channel);
+			LL_ADC_ClearFlag_OVR(adc);
+			adc_context_on_sampling_done(&data->ctx, dev);
+		} else {
+			LOG_ERR("DMA sampling complete, but DMA reported error %d", status);
+			data->dma_error = status;
+			LL_ADC_REG_StopConversion(adc);
+			dma_stop(data->dma.dma_dev, data->dma.channel);
+			adc_context_complete(&data->ctx, status);
+		}
 	}
 }
 
@@ -628,6 +634,7 @@ static int start_read(const struct device *dev,
 			}
 #else
 			LL_ADC_REG_SetSequencerRanks(adc, table_rank[data->channel_count], channel);
+			LL_ADC_REG_SetSequencerLength(adc, table_seq_len[data->channel_count]);
 #endif
 			data->channel_count++;
 			if (data->channel_count >= STM32_ADC_SEQUENCE_MAX_LEN) {
@@ -640,8 +647,6 @@ static int start_read(const struct device *dev,
 		LOG_ERR("No channels selected");
 		return -EINVAL;
 	}
-
-	LL_ADC_REG_SetSequencerLength(adc, table_seq_len[data->channel_count - 1]);
 
 	err = check_buffer_size(sequence, data->channel_count);
 	if (err) {
@@ -740,6 +745,8 @@ static int start_read(const struct device *dev,
 		return -ENOTSUP;
 #endif
 	}
+
+	LL_ADC_ClearFlag_OVR(adc);
 
 #if defined(CONFIG_SOC_SERIES_STM32F0X) || \
 	defined(CONFIG_SOC_SERIES_STM32F3X) || \
@@ -859,7 +866,7 @@ static int adc_stm32_check_acq_time(uint16_t acq_time)
 		return 0;
 	}
 
-	LOG_ERR("Conversion time not supportted.");
+	LOG_ERR("Conversion time not supported.");
 	return -EINVAL;
 }
 
