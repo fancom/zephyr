@@ -828,6 +828,20 @@
 			};
 		};
 
+		bdma1: bdma@0x58025400 {
+			compatible = "st,stm32-bdma";
+			#dma-cells = <4>;
+			reg = <0x58025400 0x400>;
+			interrupts = <129 0>, <130 0>, <131 0>, <132 0>, <133 0>, <134 0>,
+						 <135 0>, <136 0>;
+			clocks = <&rcc STM32_CLOCK_BUS_AHB4 0x00001000>;
+			st,mem2mem;
+			dma-offset = <0>;
+			dma-requests = <8>;
+			status = "disabled";
+			label = "BDMA_1";
+		};
+
 		backup_sram: memory@38800000 {
 			compatible = "st,stm32-backup-sram";
 			reg = <0x38800000 DT_SIZE_K(4)>;
