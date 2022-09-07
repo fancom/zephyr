@@ -15,6 +15,13 @@ config DMA_STM32
 	help
 	  DMA driver for STM32 series SoCs.
 
+config BDMA_STM32
+	bool "Enable STM32 BDMA driver"
+	select USE_STM32_LL_BDMA
+	depends on SOC_FAMILY_STM32
+	help
+	  BDMA driver for STM32 series SoCs.
+
 if DMA_STM32
 
 config DMA_STM32_V1
