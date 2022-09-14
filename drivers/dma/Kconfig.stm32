@@ -15,13 +15,6 @@ config DMA_STM32
 	help
 	  DMA driver for STM32 series SoCs.
 
-config BDMA_STM32
-	bool "Enable STM32 BDMA driver"
-	select USE_STM32_LL_BDMA
-	depends on SOC_FAMILY_STM32
-	help
-	  BDMA driver for STM32 series SoCs.
-
 if DMA_STM32
 
 config DMA_STM32_V1
@@ -50,3 +43,21 @@ config DMA_STM32_SHARED_IRQS
 	  Enable shared IRQ support on devices where channels share 1 IRQ.
 
 endif # DMA_STM32
+
+
+config BDMA_STM32
+	bool "Enable STM32 BDMA driver"
+	select USE_STM32_LL_BDMA
+	depends on SOC_FAMILY_STM32
+	help
+	  DMA driver for STM32 series SoCs.
+
+if BDMA_STM32
+
+config DMAMUX_STM32
+	bool
+	default $(dt_compat_enabled,$(DT_COMPAT_ST_STM32_DMAMUX))
+	help
+	  Enable DMAMUX support.
+
+endif # BDMA_STM32
