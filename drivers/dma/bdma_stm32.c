@@ -61,6 +61,17 @@ uint32_t bdma_stm32_slot_to_channel(uint32_t slot)
 }
 #endif
 
+static void bdma_stm32_clear_stream_irq(const struct device *dev, uint32_t id)
+{
+	const struct bdma_stm32_config *config = dev->config;
+	BDMA_TypeDef *bdma = (BDMA_TypeDef *)(config->base);
+
+	bdma_stm32_clear_gi(bdma, id);
+	bdma_stm32_clear_tc(bdma, id);
+	bdma_stm32_clear_ht(bdma, id);
+	bdma_stm32_clear_te(bdma, id);
+}
+
 static void bdma_stm32_irq_handler(const struct device *dev, uint32_t id)
 {
 	const struct bdma_stm32_config *config = dev->config;
@@ -172,7 +183,7 @@ bool bdma_stm32_is_gi_active(BDMA_TypeDef *BDMAx, uint32_t id)
 	return func[id](BDMAx);
 }
 
-void dma_stm32_clear_gi(BDMA_TypeDef *BDMAx, uint32_t id)
+void bdma_stm32_clear_gi(BDMA_TypeDef *BDMAx, uint32_t id)
 {
 	static const bdma_stm32_clear_flag_func func[] = {
 		LL_BDMA_ClearFlag_GI0,
@@ -298,29 +309,66 @@ void bdma_stm32_clear_te(BDMA_TypeDef *BDMAx, uint32_t id)
 	func[id](BDMAx);
 }
 
-inline bool stm32_bdma_is_tc_irq_active(DMA_TypeDef *dma, uint32_t id)
+inline bool stm32_bdma_is_tc_irq_active(BDMA_TypeDef *dma, uint32_t id)
 {
 	return LL_BDMA_IsEnabledIT_TC(dma, dma_stm32_id_to_stream(id)) &&
 	       bdma_stm32_is_tc_active(dma, id);
 }
 
-inline bool stm32_bdma_is_ht_irq_active(DMA_TypeDef *dma, uint32_t id)
+inline bool stm32_bdma_is_ht_irq_active(BDMA_TypeDef *dma, uint32_t id)
 {
 	return LL_BDMA_IsEnabledIT_HT(dma, dma_stm32_id_to_stream(id)) &&
 	       bdma_stm32_is_ht_active(dma, id);
 }
 
-static inline bool stm32_bdma_is_te_irq_active(DMA_TypeDef *dma, uint32_t id)
+static inline bool stm32_bdma_is_te_irq_active(BDMA_TypeDef *dma, uint32_t id)
 {
 	return LL_BDMA_IsEnabledIT_TE(dma, dma_stm32_id_to_stream(id)) &&
 	       bdma_stm32_is_te_active(dma, id);
 }
 
-bool stm32_dma_is_irq_active(DMA_TypeDef *dma, uint32_t id)
+bool stm32_bdma_is_irq_active(BDMA_TypeDef *bdma, uint32_t id)
 {
-	return stm32_bdma_is_tc_irq_active(dma, id) ||
-	       stm32_bdma_is_ht_irq_active(dma, id) ||
-	       stm32_bdma_is_te_irq_active(dma, id);
+	return stm32_bdma_is_tc_irq_active(bdma, id) ||
+	       stm32_bdma_is_ht_irq_active(bdma, id) ||
+	       stm32_bdma_is_te_irq_active(bdma, id);
+}
+
+void stm32_bdma_enable_stream(BDMA_TypeDef *bdma, uint32_t id)
+{
+	//TODO: This is not available in STM's BDMA driver
+	//LL_BDMA_EnableStream(bdma, bdma_stm32_id_to_stream(id));
+}
+
+int stm32_bdma_disable_stream(BDMA_TypeDef *bdma, uint32_t id)
+{
+	//TODO: This is not available in STM's BDMA driver
+	//LL_BDMA_DisableStream(bdma, bdma_stm32_id_to_stream(id));
+
+	//if (!LL_BDMA_IsEnabledStream(bdma, bdma_stm32_id_to_stream(id))) {
+	//	return 0;
+	//}
+
+	//return -EAGAIN;
+	return 0;
+}
+
+static int bdma_stm32_disable_stream(BDMA_TypeDef *bdma, uint32_t id)
+{
+	int count = 0;
+
+	for (;;) {
+		if (stm32_bdma_disable_stream(bdma, id) == 0) {
+			return 0;
+		}
+		/* After trying for 5 seconds, give up */
+		if (count++ > (5 * 1000)) {
+			return -EBUSY;
+		}
+		k_sleep(K_MSEC(1));
+	}
+
+	return 0;
 }
 
 BDMA_STM32_EXPORT_API int bdma_stm32_configure(const struct device *dev,
