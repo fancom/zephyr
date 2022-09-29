@@ -61,7 +61,6 @@ uint32_t bdma_stm32_slot_to_channel(uint32_t slot)
 }
 #endif
 
-#if 0
 static void bdma_stm32_dump_stream_irq(const struct device *dev, uint32_t id)
 {
 	const struct bdma_stm32_config *config = dev->config;
@@ -69,7 +68,6 @@ static void bdma_stm32_dump_stream_irq(const struct device *dev, uint32_t id)
 
 	stm32_dma_dump_stream_irq(dma, id);
 }
-#endif
 
 static void bdma_stm32_clear_stream_irq(const struct device *dev, uint32_t id)
 {
@@ -82,9 +80,14 @@ static void bdma_stm32_clear_stream_irq(const struct device *dev, uint32_t id)
 	bdma_stm32_clear_te(bdma, id);
 }
 
+static bool stm32_bdma_is_tc_irq_active(BDMA_TypeDef *dma, uint32_t id)
+{
+	return LL_BDMA_IsEnabledIT_TC(dma, bdma_stm32_id_to_stream(id)) &&
+	       bdma_stm32_is_tc_active(dma, id);
+}
+
 static void bdma_stm32_irq_handler(const struct device *dev, uint32_t id)
 {
-#if 0
 	const struct bdma_stm32_config *config = dev->config;
 	BDMA_TypeDef *dma = (BDMA_TypeDef *)(config->base);
 	struct bdma_stm32_stream *stream;
@@ -120,7 +123,7 @@ static void bdma_stm32_irq_handler(const struct device *dev, uint32_t id)
 			bdma_stm32_clear_tc(dma, id);
 		}
 		stream->bdma_callback(dev, stream->user_data, callback_arg, 0);
-	} else if (stm32_bdma_is_unexpected_irq_happened(dma, id)) {
+	} else if (stm32_dma_is_unexpected_irq_happened(dma, id)) {
 		LOG_ERR("Unexpected irq happened.");
 		stream->bdma_callback(dev, stream->user_data,
 				     callback_arg, -EIO);
@@ -131,7 +134,6 @@ static void bdma_stm32_irq_handler(const struct device *dev, uint32_t id)
 		stream->bdma_callback(dev, stream->user_data,
 				     callback_arg, -EIO);
 	}
-#endif
 }
 
 static int bdma_stm32_get_priority(uint8_t priority, uint32_t *ll_priority)
@@ -362,19 +364,13 @@ void bdma_stm32_clear_te(BDMA_TypeDef *BDMAx, uint32_t id)
 	func[id](BDMAx);
 }
 
-inline bool stm32_bdma_is_tc_irq_active(BDMA_TypeDef *dma, uint32_t id)
-{
-	return LL_BDMA_IsEnabledIT_TC(dma, bdma_stm32_id_to_stream(id)) &&
-	       bdma_stm32_is_tc_active(dma, id);
-}
-
-inline bool stm32_bdma_is_ht_irq_active(BDMA_TypeDef *dma, uint32_t id)
+static bool stm32_bdma_is_ht_irq_active(BDMA_TypeDef *dma, uint32_t id)
 {
 	return LL_BDMA_IsEnabledIT_HT(dma, bdma_stm32_id_to_stream(id)) &&
 	       bdma_stm32_is_ht_active(dma, id);
 }
 
-static inline bool stm32_bdma_is_te_irq_active(BDMA_TypeDef *dma, uint32_t id)
+static bool stm32_bdma_is_te_irq_active(BDMA_TypeDef *dma, uint32_t id)
 {
 	return LL_BDMA_IsEnabledIT_TE(dma, bdma_stm32_id_to_stream(id)) &&
 	       bdma_stm32_is_te_active(dma, id);
