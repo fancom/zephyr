@@ -11,6 +11,7 @@
  *        implemented in dma_stm32.c
  */
 
+#include <assert.h>
 #include <soc.h>
 #include <stm32_ll_dmamux.h>
 #include <init.h>
@@ -85,23 +86,23 @@ void (*func_ll_clear_rgo[])(DMAMUX_Channel_TypeDef *DMAMUXx) = {
 	UTIL_LISTIFY(DT_INST_PROP(0, dma_generators), CLEAR_FLAG_RGOX)
 };
 
-typedef int (*dma_configure)(const struct device *dev, uint32_t id, struct dma_config *config);
-typedef int (*dma_start)(const struct device *dev, uint32_t id);
-typedef int (*dma_stop)(const struct device *dev, uint32_t id);
-typedef int (*dma_reload)(const struct device *dev, uint32_t id,
+typedef int (*dma_configure_fn)(const struct device *dev, uint32_t id, struct dma_config *config);
+typedef int (*dma_start_fn)(const struct device *dev, uint32_t id);
+typedef int (*dma_stop_fn)(const struct device *dev, uint32_t id);
+typedef int (*dma_reload_fn)(const struct device *dev, uint32_t id,
 			uint32_t src, uint32_t dst, size_t size);
-typedef int (*dma_status)(const struct device *dev, uint32_t id,
-				struct bdma_status *stat);
+typedef int (*dma_status_fn)(const struct device *dev, uint32_t id,
+				struct dma_status *stat);
 
 struct dmamux_stm32_dma_fops {
-	dma_configure configure;
-	dma_start start;
-	dma_stop stop;
-	dma_reload reload;
-       	dma_status get_status;
+	dma_configure_fn configure;
+	dma_start_fn start;
+	dma_stop_fn stop;
+	dma_reload_fn reload;
+       	dma_status_fn get_status;
  };
 
-struct dmamux_stm32_dma_fops dmamux1 {
+static const struct dmamux_stm32_dma_fops dmamux1 = {
 	dma_stm32_configure,
 	dma_stm32_start,
 	dma_stm32_stop,
@@ -110,7 +111,7 @@ struct dmamux_stm32_dma_fops dmamux1 {
 };
 
 #ifdef CONFIG_BDMAMUX_STM32
-struct dmamux_stm32_dma_fops dmamux2 {
+static const struct dmamux_stm32_dma_fops dmamux2 = {
 	bdma_stm32_configure,
 	bdma_stm32_start,
 	bdma_stm32_stop,
@@ -124,7 +125,7 @@ struct dmamux_stm32_dma_fops* get_dma_fops(const struct dmamux_stm32_config* dev
 #ifdef CONFIG_BDMAMUX_STM32
 	else if (dev->base == DT_INST_REG_ADDR(0)) return &dmamux2;
 #endif
-	return null;
+	return (void*)0;
 }
 
 int dmamux_stm32_configure(const struct device *dev, uint32_t id,
@@ -133,7 +134,7 @@ int dmamux_stm32_configure(const struct device *dev, uint32_t id,
 	/* device is the dmamux, id is the dmamux channel from 0 */
 	const struct dmamux_stm32_config *dev_config = dev->config;
 	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev);
-	assert(dma_device != null);
+	assert(dma_device != (void*)0);
 
 	/*
 	 * request line ID for this mux channel is stored
@@ -183,7 +184,7 @@ int dmamux_stm32_start(const struct device *dev, uint32_t id)
 {
 	const struct dmamux_stm32_config *dev_config = dev->config;
 	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev);
-	assert(dma_device != null);
+	assert(dma_device != (void*)0);
 
 	/* check if this channel is valid */
 	if (id >= dev_config->channel_nb) {
@@ -204,7 +205,7 @@ int dmamux_stm32_stop(const struct device *dev, uint32_t id)
 {
 	const struct dmamux_stm32_config *dev_config = dev->config;
 	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev);
-	assert(dma_device != null);
+	assert(dma_device != (void*)0);
 
 	/* check if this channel is valid */
 	if (id >= dev_config->channel_nb) {
@@ -226,7 +227,7 @@ int dmamux_stm32_reload(const struct device *dev, uint32_t id,
 {
 	const struct dmamux_stm32_config *dev_config = dev->config;
 	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev);
-	assert(dma_device != null);
+	assert(dma_device != (void*)0);
 
 	/* check if this channel is valid */
 	if (id >= dev_config->channel_nb) {
@@ -249,7 +250,7 @@ int dmamux_stm32_get_status(const struct device *dev, uint32_t id,
 {
 	const struct dmamux_stm32_config *dev_config = dev->config;
 	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev);
-	assert(dma_device != null);
+	assert(dma_device != (void*)0);
 
 	/* check if this channel is valid */
 	if (id >= dev_config->channel_nb) {
