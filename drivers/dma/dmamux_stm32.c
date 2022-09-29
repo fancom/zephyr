@@ -352,8 +352,8 @@ static const struct dma_driver_api dma_funcs = {
 #define DEV_DMA2 COND_CODE_1(DT_NODE_HAS_STATUS(DT_NODELABEL(dma2), okay), \
 			     DEVICE_DT_GET(DT_NODELABEL(dma2)), NULL)
 
-#define DEV_BDMA COND_CODE_1(DT_NODE_HAS_STATUS(DT_NODELABEL(bdma), okay), \
-			     DEVICE_DT_GET(DT_NODELABEL(bdma)), NULL)
+#define DEV_BDMA COND_CODE_1(DT_NODE_HAS_STATUS(DT_NODELABEL(bdma1), okay), \
+			     DEVICE_DT_GET(DT_NODELABEL(bdma1)), NULL)
 
 #define DEV_DMA_BINDING(mux_channel) \
 	((mux_channel < DMA_1_END_DMAMUX_CHANNEL) ? DEV_DMA1 : DEV_DMA2)
