@@ -36,9 +36,22 @@ static uint32_t table_p_size[] = {
 	LL_BDMA_PDATAALIGN_WORD,
 };
 
-static uint32_t bdma_stm32_id_to_stream(uint32_t id)
+static uint32_t bdma_stm32_id_to_channel(uint32_t id)
 {
-	return id;
+	static const uint32_t channel_nr[] = {
+		LL_BDMA_CHANNEL_0,
+		LL_BDMA_CHANNEL_0,
+		LL_BDMA_CHANNEL_0,
+		LL_BDMA_CHANNEL_0,
+		LL_BDMA_CHANNEL_0,
+		LL_BDMA_CHANNEL_0,
+		LL_BDMA_CHANNEL_0,
+		LL_BDMA_CHANNEL_0,
+	};
+
+	__ASSERT_NO_MSG(id < ARRAY_SIZE(channel_nr));
+
+	return channel_nr[id];
 }
 
 #if !defined(CONFIG_DMAMUX_STM32)
@@ -63,10 +76,6 @@ uint32_t bdma_stm32_slot_to_channel(uint32_t slot)
 
 static void bdma_stm32_dump_stream_irq(const struct device *dev, uint32_t id)
 {
-	const struct bdma_stm32_config *config = dev->config;
-	BDMA_TypeDef *dma = (BDMA_TypeDef *)(config->base);
-
-	stm32_dma_dump_stream_irq(dma, id);
 }
 
 static void bdma_stm32_clear_stream_irq(const struct device *dev, uint32_t id)
@@ -82,7 +91,7 @@ static void bdma_stm32_clear_stream_irq(const struct device *dev, uint32_t id)
 
 static bool stm32_bdma_is_tc_irq_active(BDMA_TypeDef *dma, uint32_t id)
 {
-	return LL_BDMA_IsEnabledIT_TC(dma, bdma_stm32_id_to_stream(id)) &&
+	return LL_BDMA_IsEnabledIT_TC(dma, bdma_stm32_id_to_channel(id)) &&
 	       bdma_stm32_is_tc_active(dma, id);
 }
 
@@ -366,13 +375,13 @@ void bdma_stm32_clear_te(BDMA_TypeDef *BDMAx, uint32_t id)
 
 static bool stm32_bdma_is_ht_irq_active(BDMA_TypeDef *dma, uint32_t id)
 {
-	return LL_BDMA_IsEnabledIT_HT(dma, bdma_stm32_id_to_stream(id)) &&
+	return LL_BDMA_IsEnabledIT_HT(dma, bdma_stm32_id_to_channel(id)) &&
 	       bdma_stm32_is_ht_active(dma, id);
 }
 
 static bool stm32_bdma_is_te_irq_active(BDMA_TypeDef *dma, uint32_t id)
 {
-	return LL_BDMA_IsEnabledIT_TE(dma, bdma_stm32_id_to_stream(id)) &&
+	return LL_BDMA_IsEnabledIT_TE(dma, bdma_stm32_id_to_channel(id)) &&
 	       bdma_stm32_is_te_active(dma, id);
 }
 
@@ -383,23 +392,20 @@ bool stm32_bdma_is_irq_active(BDMA_TypeDef *bdma, uint32_t id)
 	       stm32_bdma_is_te_irq_active(bdma, id);
 }
 
-void stm32_bdma_enable_stream(BDMA_TypeDef *bdma, uint32_t id)
+void stm32_bdma_enable_channel(BDMA_TypeDef *bdma, uint32_t id)
 {
-	//TODO: This is not available in STM's BDMA driver
-	//LL_BDMA_EnableStream(bdma, bdma_stm32_id_to_stream(id));
+	LL_BDMA_EnableChannel(bdma, bdma_stm32_id_to_channel(id));
 }
 
 int stm32_bdma_disable_stream(BDMA_TypeDef *bdma, uint32_t id)
 {
-	//TODO: This is not available in STM's BDMA driver
-	//LL_BDMA_DisableStream(bdma, bdma_stm32_id_to_stream(id));
+	LL_BDMA_DisableChannel(bdma, bdma_stm32_id_to_channel(id));
 
-	//if (!LL_BDMA_IsEnabledStream(bdma, bdma_stm32_id_to_stream(id))) {
-	//	return 0;
-	//}
+	if (!LL_BDMA_IsEnabledChannel(bdma, bdma_stm32_id_to_channel(id))) {
+		return 0;
+	}
 
-	//return -EAGAIN;
-	return 0;
+	return -EAGAIN;
 }
 
 static int bdma_stm32_disable_stream(BDMA_TypeDef *bdma, uint32_t id)
@@ -626,22 +632,22 @@ BDMA_STM32_EXPORT_API int bdma_stm32_configure(const struct device *dev,
 	BDMA_InitStruct.PeriphRequest = config->dma_slot;
 #endif
 #endif
-	LL_BDMA_Init(bdma, bdma_stm32_id_to_stream(id), &BDMA_InitStruct);
+	LL_BDMA_Init(bdma, bdma_stm32_id_to_channel(id), &BDMA_InitStruct);
 
-	LL_BDMA_EnableIT_TC(bdma, bdma_stm32_id_to_stream(id));
+	LL_BDMA_EnableIT_TC(bdma, bdma_stm32_id_to_channel(id));
 
 	/* Enable Half-Transfer irq if circular mode is enabled */
 	if (config->head_block->source_reload_en) {
-		LL_BDMA_EnableIT_HT(bdma, bdma_stm32_id_to_stream(id));
+		LL_BDMA_EnableIT_HT(bdma, bdma_stm32_id_to_channel(id));
 	}
 
 #if defined(CONFIG_BDMA_STM32_V1)
 	if (BDMA_InitStruct.FIFOMode == LL_BDMA_FIFOMODE_ENABLE) {
-		LL_BDMA_EnableFifoMode(bdma, bdma_stm32_id_to_stream(id));
-		LL_BDMA_EnableIT_FE(bdma, bdma_stm32_id_to_stream(id));
+		LL_BDMA_EnableFifoMode(bdma, bdma_stm32_id_to_channel(id));
+		LL_BDMA_EnableIT_FE(bdma, bdma_stm32_id_to_channel(id));
 	} else {
-		LL_BDMA_DisableFifoMode(bdma, bdma_stm32_id_to_stream(id));
-		LL_BDMA_DisableIT_FE(bdma, bdma_stm32_id_to_stream(id));
+		LL_BDMA_DisableFifoMode(bdma, bdma_stm32_id_to_channel(id));
+		LL_BDMA_DisableIT_FE(bdma, bdma_stm32_id_to_channel(id));
 	}
 #endif
 	return ret;
@@ -667,27 +673,27 @@ BDMA_STM32_EXPORT_API int bdma_stm32_reload(const struct device *dev, uint32_t i
 
 	switch (stream->direction) {
 	case MEMORY_TO_PERIPHERAL:
-		LL_BDMA_SetMemoryAddress(bdma, bdma_stm32_id_to_stream(id), src);
-		LL_BDMA_SetPeriphAddress(bdma, bdma_stm32_id_to_stream(id), dst);
+		LL_BDMA_SetMemoryAddress(bdma, bdma_stm32_id_to_channel(id), src);
+		LL_BDMA_SetPeriphAddress(bdma, bdma_stm32_id_to_channel(id), dst);
 		break;
 	case MEMORY_TO_MEMORY:
 	case PERIPHERAL_TO_MEMORY:
-		LL_BDMA_SetPeriphAddress(bdma, bdma_stm32_id_to_stream(id), src);
-		LL_BDMA_SetMemoryAddress(bdma, bdma_stm32_id_to_stream(id), dst);
+		LL_BDMA_SetPeriphAddress(bdma, bdma_stm32_id_to_channel(id), src);
+		LL_BDMA_SetMemoryAddress(bdma, bdma_stm32_id_to_channel(id), dst);
 		break;
 	default:
 		return -EINVAL;
 	}
 
 	if (stream->source_periph) {
-		LL_BDMA_SetDataLength(bdma, bdma_stm32_id_to_stream(id),
+		LL_BDMA_SetDataLength(bdma, bdma_stm32_id_to_channel(id),
 				     size / stream->src_size);
 	} else {
-		LL_BDMA_SetDataLength(bdma, bdma_stm32_id_to_stream(id),
+		LL_BDMA_SetDataLength(bdma, bdma_stm32_id_to_channel(id),
 				     size / stream->dst_size);
 	}
 
-	stm32_bdma_enable_stream(bdma, id);
+	stm32_bdma_enable_channel(bdma, id);
 
 	return 0;
 }
@@ -704,7 +710,7 @@ BDMA_STM32_EXPORT_API int bdma_stm32_start(const struct device *dev, uint32_t id
 
 	bdma_stm32_clear_stream_irq(dev, id);
 
-	stm32_bdma_enable_stream(bdma, id);
+	stm32_bdma_enable_channel(bdma, id);
 
 	return 0;
 }
@@ -720,8 +726,8 @@ BDMA_STM32_EXPORT_API int bdma_stm32_stop(const struct device *dev, uint32_t id)
 	}
 
 	/* in bdma_stm32_configure, enabling is done regardless of defines */
-	LL_BDMA_DisableIT_TC(bdma, bdma_stm32_id_to_stream(id));
-	LL_BDMA_DisableIT_HT(bdma, bdma_stm32_id_to_stream(id));
+	LL_BDMA_DisableIT_TC(bdma, bdma_stm32_id_to_channel(id));
+	LL_BDMA_DisableIT_HT(bdma, bdma_stm32_id_to_channel(id));
 
 #if defined(CONFIG_BDMA_STM32_V1)
 	stm32_bdma_disable_fifo_irq(bdma, id);
@@ -771,7 +777,7 @@ BDMA_STM32_EXPORT_API int bdma_stm32_get_status(const struct device *dev,
 	}
 
 	stream = &config->streams[id];
-	stat->pending_length = LL_BDMA_GetDataLength(bdma, bdma_stm32_id_to_stream(id));
+	stat->pending_length = LL_BDMA_GetDataLength(bdma, bdma_stm32_id_to_channel(id));
 	stat->dir = stream->direction;
 	stat->busy = stream->busy;
 
