@@ -120,13 +120,13 @@ static const struct dmamux_stm32_dma_fops dmamux2 = {
 };
 #endif
 
-struct dmamux_stm32_dma_fops* get_dma_fops(const struct dmamux_stm32_config* dev) {
-	if (dev->base == DT_INST_REG_ADDR(0)) {
+struct dmamux_stm32_dma_fops* get_dma_fops(const struct dmamux_stm32_config* dev_config) {
+	if (dev_config->base == DT_INST_REG_ADDR(0)) {
 		printf("get_dma_fops: return mux1\n");
 		return &dmamux1;
 	}
 #ifdef CONFIG_BDMA_STM32
-	else if (dev->base == DT_INST_REG_ADDR(0)) {
+	else if (dev_config->base == DT_INST_REG_ADDR(1)) {
 		printf("get_dma_fops: return mux2\n");
 		return &dmamux2;
 	}
