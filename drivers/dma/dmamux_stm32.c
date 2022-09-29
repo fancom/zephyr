@@ -331,7 +331,7 @@ static const struct dma_driver_api dma_funcs = {
 };
 
 /*
- * Each dmamux channel is hardwired to one dma controlers dma channel.
+ * Each dmamux channel is hardwired to one dma controllers dma channel.
  * DMAMUX_CHANNEL_INIT_X macros resolve this mapping at build time for each
  * dmamux channel using the dma dt properties dma_offset and dma_requests,
  * such that it can be stored in dmamux_stm32_channels_X configuration.
@@ -352,6 +352,9 @@ static const struct dma_driver_api dma_funcs = {
 #define DEV_DMA2 COND_CODE_1(DT_NODE_HAS_STATUS(DT_NODELABEL(dma2), okay), \
 			     DEVICE_DT_GET(DT_NODELABEL(dma2)), NULL)
 
+#define BDMA_1_BEGIN_DMAMUX_CHANNEL DT_PROP_OR(DT_NODELABEL(bdma1), dma_offset, 0)
+#define BDMA_1_END_DMAMUX_CHANNEL (BDMA_1_BEGIN_DMAMUX_CHANNEL + \
+				DT_PROP_OR(DT_NODELABEL(bdma1), dma_requests, 0))
 #define DEV_BDMA COND_CODE_1(DT_NODE_HAS_STATUS(DT_NODELABEL(bdma1), okay), \
 			     DEVICE_DT_GET(DT_NODELABEL(bdma1)), NULL)
 
@@ -366,11 +369,9 @@ static const struct dma_driver_api dma_funcs = {
 	((mux_channel < DMA_1_END_DMAMUX_CHANNEL) ? \
 	 (mux_channel + 1) : (mux_channel - DMA_2_BEGIN_DMAMUX_CHANNEL + 1))
 
-/*
- * TODO: correct?
- */
 #define BDMA_CHANNEL(mux_channel) \
-	(mux_channel + 1)
+	((mux_channel < BDMA_1_END_DMAMUX_CHANNEL) ? \
+	 (mux_channel + 1) : 0/*non-existing atm*/)
 
 /*
  * No series implements more than 1 dmamux yet, dummy define added for easier
