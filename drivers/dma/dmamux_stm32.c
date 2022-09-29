@@ -139,7 +139,7 @@ int dmamux_stm32_configure(const struct device *dev, uint32_t id,
 {
 	/* device is the dmamux, id is the dmamux channel from 0 */
 	const struct dmamux_stm32_config *dev_config = dev->config;
-	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev);
+	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev_config);
 	assert(dma_device != (void*)0);
 
 	/*
@@ -189,7 +189,7 @@ int dmamux_stm32_configure(const struct device *dev, uint32_t id,
 int dmamux_stm32_start(const struct device *dev, uint32_t id)
 {
 	const struct dmamux_stm32_config *dev_config = dev->config;
-	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev);
+	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev_config);
 	assert(dma_device != (void*)0);
 
 	/* check if this channel is valid */
@@ -211,7 +211,7 @@ int dmamux_stm32_start(const struct device *dev, uint32_t id)
 int dmamux_stm32_stop(const struct device *dev, uint32_t id)
 {
 	const struct dmamux_stm32_config *dev_config = dev->config;
-	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev);
+	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev_config);
 	assert(dma_device != (void*)0);
 
 	/* check if this channel is valid */
@@ -234,7 +234,7 @@ int dmamux_stm32_reload(const struct device *dev, uint32_t id,
 			    uint32_t src, uint32_t dst, size_t size)
 {
 	const struct dmamux_stm32_config *dev_config = dev->config;
-	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev);
+	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev_config);
 	assert(dma_device != (void*)0);
 
 	/* check if this channel is valid */
@@ -258,7 +258,7 @@ int dmamux_stm32_get_status(const struct device *dev, uint32_t id,
 				struct dma_status *stat)
 {
 	const struct dmamux_stm32_config *dev_config = dev->config;
-	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev);
+	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev_config);
 	assert(dma_device != (void*)0);
 
 	/* check if this channel is valid */
@@ -278,41 +278,46 @@ int dmamux_stm32_get_status(const struct device *dev, uint32_t id,
 
 static int dmamux_stm32_init(const struct device *dev)
 {
+	const struct dmamux_stm32_config *dev_config = dev->config;
 #if DT_INST_NODE_HAS_PROP(0, clocks)
-	const struct dmamux_stm32_config *config = dev->config;
 	const struct device *clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
 
 	if (clock_control_on(clk,
-		(clock_control_subsys_t *) &config->pclken) != 0) {
+		(clock_control_subsys_t *) &dev_config->pclken) != 0) {
 		LOG_ERR("clock op failed\n");
 		return -EIO;
 	}
 #endif /* DT_INST_NODE_HAS_PROP(0, clocks) */
 
-	/* DMAs assigned to DMAMUX channels at build time might not be ready. */
+	/* DMA 1 and DMA2 for DMAMUX1, BDMA for DMAMUX2 */
+	if (dev_config->base == DT_INST_REG_ADDR(0)) {
+		/* DMAs assigned to DMAMUX channels at build time might not be ready. */
 #if DT_NODE_HAS_STATUS(DT_NODELABEL(dma1), okay)
-	if (device_is_ready(DEVICE_DT_GET(DT_NODELABEL(dma1))) == false) {
-		printf("dmamux_stm32_init: dma1 is NOT ready\n");
-		return -ENODEV;
-	}
-	printf("dmamux_stm32_init: dma1 is ready\n");
+		if (device_is_ready(DEVICE_DT_GET(DT_NODELABEL(dma1))) == false) {
+			printf("dmamux_stm32_init: dma1 is NOT ready\n");
+			return -ENODEV;
+		}
+		printf("dmamux_stm32_init: dma1 is ready\n");
 #endif
 #if DT_NODE_HAS_STATUS(DT_NODELABEL(dma2), okay)
-	if (device_is_ready(DEVICE_DT_GET(DT_NODELABEL(dma2))) == false) {
-		printf("dmamux_stm32_init: dma2 is NOT ready\n");
-		return -ENODEV;
-	}
-	printf("dmamux_stm32_init: dma2 is ready\n");
+		if (device_is_ready(DEVICE_DT_GET(DT_NODELABEL(dma2))) == false) {
+			printf("dmamux_stm32_init: dma2 is NOT ready\n");
+			return -ENODEV;
+		}
+		printf("dmamux_stm32_init: dma2 is ready\n");
 #endif
+	}
 
 #ifdef CONFIG_BDMA_STM32
+	if (dev_config->base == DT_INST_REG_ADDR(0)) {
 #if DT_NODE_HAS_STATUS(DT_NODELABEL(bdma1), okay)
-	if (device_is_ready(DEVICE_DT_GET(DT_NODELABEL(bdma1))) == false) {
-		printf("dmamux_stm32_init: bdma1 is NOT ready\n");
-		return -ENODEV;
-	}
-	printf("dmamux_stm32_init: bdma1 is ready\n");
+		if (device_is_ready(DEVICE_DT_GET(DT_NODELABEL(bdma1))) == false) {
+			printf("dmamux_stm32_init: bdma1 is NOT ready\n");
+			return -ENODEV;
+		}
+		printf("dmamux_stm32_init: bdma1 is ready\n");
 #endif
+	}
 #endif
 	return 0;
 }
