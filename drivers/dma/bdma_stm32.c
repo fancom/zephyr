@@ -61,6 +61,16 @@ uint32_t bdma_stm32_slot_to_channel(uint32_t slot)
 }
 #endif
 
+#if 0
+static void bdma_stm32_dump_stream_irq(const struct device *dev, uint32_t id)
+{
+	const struct bdma_stm32_config *config = dev->config;
+	BDMA_TypeDef *dma = (BDMA_TypeDef *)(config->base);
+
+	stm32_dma_dump_stream_irq(dma, id);
+}
+#endif
+
 static void bdma_stm32_clear_stream_irq(const struct device *dev, uint32_t id)
 {
 	const struct bdma_stm32_config *config = dev->config;
@@ -74,11 +84,54 @@ static void bdma_stm32_clear_stream_irq(const struct device *dev, uint32_t id)
 
 static void bdma_stm32_irq_handler(const struct device *dev, uint32_t id)
 {
+#if 0
 	const struct bdma_stm32_config *config = dev->config;
-	BDMA_TypeDef *bdma = (BDMA_TypeDef *)(config->base);
+	BDMA_TypeDef *dma = (BDMA_TypeDef *)(config->base);
+	struct bdma_stm32_stream *stream;
 	uint32_t callback_arg;
 
-	callback_arg = id;
+	__ASSERT_NO_MSG(id < config->max_streams);
+
+	stream = &config->streams[id];
+
+#ifdef CONFIG_DMAMUX_STM32
+	callback_arg = stream->mux_channel;
+#else
+	callback_arg = id + STREAM_OFFSET;
+#endif /* CONFIG_DMAMUX_STM32 */
+
+	if (!IS_ENABLED(CONFIG_DMAMUX_STM32)) {
+		stream->busy = false;
+	}
+
+	/* the dma stream id is in range from STREAM_OFFSET..<dma-requests> */
+	if (stm32_bdma_is_irq_active(dma, id)) {
+		/* Let HAL DMA handle flags on its own */
+		if (!stream->hal_override) {
+			bdma_stm32_clear_ht(dma, id);
+		}
+		stream->bdma_callback(dev, stream->user_data, callback_arg, 0);
+	} else if (stm32_bdma_is_tc_irq_active(dma, id)) {
+#ifdef CONFIG_DMAMUX_STM32
+		stream->busy = false;
+#endif
+		/* Let HAL DMA handle flags on its own */
+		if (!stream->hal_override) {
+			bdma_stm32_clear_tc(dma, id);
+		}
+		stream->bdma_callback(dev, stream->user_data, callback_arg, 0);
+	} else if (stm32_bdma_is_unexpected_irq_happened(dma, id)) {
+		LOG_ERR("Unexpected irq happened.");
+		stream->bdma_callback(dev, stream->user_data,
+				     callback_arg, -EIO);
+	} else {
+		LOG_ERR("Transfer Error.");
+		bdma_stm32_dump_stream_irq(dev, id);
+		bdma_stm32_clear_stream_irq(dev, id);
+		stream->bdma_callback(dev, stream->user_data,
+				     callback_arg, -EIO);
+	}
+#endif
 }
 
 static int bdma_stm32_get_priority(uint8_t priority, uint32_t *ll_priority)
@@ -311,19 +364,19 @@ void bdma_stm32_clear_te(BDMA_TypeDef *BDMAx, uint32_t id)
 
 inline bool stm32_bdma_is_tc_irq_active(BDMA_TypeDef *dma, uint32_t id)
 {
-	return LL_BDMA_IsEnabledIT_TC(dma, dma_stm32_id_to_stream(id)) &&
+	return LL_BDMA_IsEnabledIT_TC(dma, bdma_stm32_id_to_stream(id)) &&
 	       bdma_stm32_is_tc_active(dma, id);
 }
 
 inline bool stm32_bdma_is_ht_irq_active(BDMA_TypeDef *dma, uint32_t id)
 {
-	return LL_BDMA_IsEnabledIT_HT(dma, dma_stm32_id_to_stream(id)) &&
+	return LL_BDMA_IsEnabledIT_HT(dma, bdma_stm32_id_to_stream(id)) &&
 	       bdma_stm32_is_ht_active(dma, id);
 }
 
 static inline bool stm32_bdma_is_te_irq_active(BDMA_TypeDef *dma, uint32_t id)
 {
-	return LL_BDMA_IsEnabledIT_TE(dma, dma_stm32_id_to_stream(id)) &&
+	return LL_BDMA_IsEnabledIT_TE(dma, bdma_stm32_id_to_stream(id)) &&
 	       bdma_stm32_is_te_active(dma, id);
 }
 
@@ -540,18 +593,18 @@ BDMA_STM32_EXPORT_API int bdma_stm32_configure(const struct device *dev,
 
 #if !defined(CONFIG_SOC_SERIES_STM32H7X)
 	if (config->channel_direction != MEMORY_TO_MEMORY) {
-		if (config->bdma_slot >= 8) {
-			LOG_ERR("bdma slot error.");
+		if (config->dma_slot >= 8) {
+			LOG_ERR("dma slot error.");
 			return -EINVAL;
 		}
 	} else {
-		if (config->bdma_slot >= 8) {
-			LOG_ERR("bdma slot is too big, using 0 as default.");
-			config->bdma_slot = 0;
+		if (config->dma_slot >= 8) {
+			LOG_ERR("dma slot is too big, using 0 as default.");
+			config->dma_slot = 0;
 		}
 	}
 
-	BDMA_InitStruct.Channel = bdma_stm32_slot_to_channel(config->bdma_slot);
+	BDMA_InitStruct.Channel = bdma_stm32_slot_to_channel(config->dma_slot);
 #endif
 
 	if (stm32_bdma_check_fifo_mburst(&BDMA_InitStruct)) {
@@ -568,13 +621,13 @@ BDMA_STM32_EXPORT_API int bdma_stm32_configure(const struct device *dev,
 					config->dest_data_size;
 	}
 
-#if defined(CONFIG_BDMA_STM32_V2) || defined(CONFIG_BDMAMUX_STM32)
+#if defined(CONFIG_BDMA_STM32_V2) || defined(CONFIG_DMAMUX_STM32)
 	/*
 	 * the with bdma V2 and bdma mux,
-	 * the request ID is stored in the bdma_slot
+	 * the request ID is stored in the dma_slot
 	 */
 #if !defined(CONFIG_SOC_SERIES_STM32F0X) || defined(CONFIG_SOC_STM32F030XC)
-	BDMA_InitStruct.PeriphRequest = config->bdma_slot;
+	BDMA_InitStruct.PeriphRequest = config->dma_slot;
 #endif
 #endif
 	LL_BDMA_Init(bdma, bdma_stm32_id_to_stream(id), &BDMA_InitStruct);
@@ -701,10 +754,10 @@ static int bdma_stm32_init(const struct device *dev)
 
 	for (uint32_t i = 0; i < config->max_streams; i++) {
 		config->streams[i].busy = false;
-#ifdef CONFIG_BDMAMUX_STM32
+#ifdef CONFIG_DMAMUX_STM32
 		/* each further stream->mux_channel is fixed here */
 		config->streams[i].mux_channel = i + config->offset;
-#endif /* CONFIG_BDMAMUX_STM32 */
+#endif /* CONFIG_DMAMUX_STM32 */
 	}
 
 	return 0;
@@ -737,12 +790,12 @@ static const struct dma_driver_api dma_funcs = {
 	.get_status	 = bdma_stm32_get_status,
 };
 
-#ifdef CONFIG_BDMAMUX_STM32
+#ifdef CONFIG_DMAMUX_STM32
 #define BDMA_STM32_OFFSET_INIT(index)			\
-	.offset = DT_INST_PROP(index, bdma_offset),
+	.offset = DT_INST_PROP(index, dma_offset),
 #else
 #define BDMA_STM32_OFFSET_INIT(index)
-#endif /* CONFIG_BDMAMUX_STM32 */
+#endif /* CONFIG_DMAMUX_STM32 */
 
 #ifdef CONFIG_BDMA_STM32_V1
 #define BDMA_STM32_MEM2MEM_INIT(index)					\
@@ -856,51 +909,3 @@ static void bdma_stm32_config_irq_0(const struct device *dev)
 BDMA_STM32_INIT_DEV(0);
 
 #endif /* DT_NODE_HAS_STATUS(DT_DRV_INST(0), okay) */
-
-
-#if DT_NODE_HAS_STATUS(DT_DRV_INST(1), okay)
-
-BDMA_STM32_DEFINE_IRQ_HANDLER(1, 0);
-BDMA_STM32_DEFINE_IRQ_HANDLER(1, 1);
-BDMA_STM32_DEFINE_IRQ_HANDLER(1, 2);
-BDMA_STM32_DEFINE_IRQ_HANDLER(1, 3);
-BDMA_STM32_DEFINE_IRQ_HANDLER(1, 4);
-#if DT_INST_IRQ_HAS_IDX(1, 5)
-BDMA_STM32_DEFINE_IRQ_HANDLER(1, 5);
-#if DT_INST_IRQ_HAS_IDX(1, 6)
-BDMA_STM32_DEFINE_IRQ_HANDLER(1, 6);
-#if DT_INST_IRQ_HAS_IDX(1, 7)
-BDMA_STM32_DEFINE_IRQ_HANDLER(1, 7);
-#endif /* DT_INST_IRQ_HAS_IDX(1, 5) */
-#endif /* DT_INST_IRQ_HAS_IDX(1, 6) */
-#endif /* DT_INST_IRQ_HAS_IDX(1, 7) */
-
-static void bdma_stm32_config_irq_1(const struct device *dev)
-{
-	ARG_UNUSED(dev);
-
-#ifndef CONFIG_BDMA_STM32_SHARED_IRQS
-	BDMA_STM32_IRQ_CONNECT(1, 0);
-	BDMA_STM32_IRQ_CONNECT(1, 1);
-	BDMA_STM32_IRQ_CONNECT(1, 2);
-	BDMA_STM32_IRQ_CONNECT(1, 3);
-	BDMA_STM32_IRQ_CONNECT(1, 4);
-#if DT_INST_IRQ_HAS_IDX(1, 5)
-	BDMA_STM32_IRQ_CONNECT(1, 5);
-#if DT_INST_IRQ_HAS_IDX(1, 6)
-	BDMA_STM32_IRQ_CONNECT(1, 6);
-#if DT_INST_IRQ_HAS_IDX(1, 7)
-	BDMA_STM32_IRQ_CONNECT(1, 7);
-#endif /* DT_INST_IRQ_HAS_IDX(1, 5) */
-#endif /* DT_INST_IRQ_HAS_IDX(1, 6) */
-#endif /* DT_INST_IRQ_HAS_IDX(1, 7) */
-#endif /* CONFIG_BDMA_STM32_SHARED_IRQS */
-/*
- * Either 5 or 6 or 7 or 8 channels for BDMA across all stm32 series.
- * STM32F0 and STM32G0: if bdma2 exits, the channel interrupts overlap with bdma1
- */
-}
-
-BDMA_STM32_INIT_DEV(1);
-
-#endif /* DT_NODE_HAS_STATUS(DT_DRV_INST(1), okay) */

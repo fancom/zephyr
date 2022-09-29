@@ -20,7 +20,7 @@
 #include <drivers/clock_control/stm32_clock_control.h>
 
 #include "dma_stm32.h"
-#ifdef CONFIG_BDMAMUX_STM32
+#ifdef CONFIG_BDMA_STM32
 #include "bdma_stm32.h"
 #endif
 
@@ -110,7 +110,7 @@ static const struct dmamux_stm32_dma_fops dmamux1 = {
 	dma_stm32_get_status,
 };
 
-#ifdef CONFIG_BDMAMUX_STM32
+#ifdef CONFIG_BDMA_STM32
 static const struct dmamux_stm32_dma_fops dmamux2 = {
 	bdma_stm32_configure,
 	bdma_stm32_start,
@@ -121,9 +121,15 @@ static const struct dmamux_stm32_dma_fops dmamux2 = {
 #endif
 
 struct dmamux_stm32_dma_fops* get_dma_fops(const struct dmamux_stm32_config* dev) {
-	if (dev->base == DT_INST_REG_ADDR(0)) return &dmamux1;
-#ifdef CONFIG_BDMAMUX_STM32
-	else if (dev->base == DT_INST_REG_ADDR(0)) return &dmamux2;
+	if (dev->base == DT_INST_REG_ADDR(0)) {
+		printf("get_dma_fops: return mux1\n");
+		return &dmamux1;
+	}
+#ifdef CONFIG_BDMA_STM32
+	else if (dev->base == DT_INST_REG_ADDR(0)) {
+		printf("get_dma_fops: return mux2\n");
+		return &dmamux2;
+	}
 #endif
 	return (void*)0;
 }
@@ -164,7 +170,7 @@ int dmamux_stm32_configure(const struct device *dev, uint32_t id,
 	 * This dmamux channel 'id' is now used for this peripheral request
 	 * It gives this mux request ID to the dma through the config.dma_slot
 	 */
-
+	printf("dmamux_stm32_configure\n");
 	if (dma_device->configure(dev_config->mux_channels[id].dev_dma,
 			dev_config->mux_channels[id].dma_id, config) != 0) {
 		LOG_ERR("cannot configure the dmamux.");
@@ -192,6 +198,7 @@ int dmamux_stm32_start(const struct device *dev, uint32_t id)
 		return -EINVAL;
 	}
 
+	printf("dmamux_stm32_start\n");
 	if (dma_device->start(dev_config->mux_channels[id].dev_dma,
 		dev_config->mux_channels[id].dma_id) != 0) {
 		LOG_ERR("cannot start the dmamux channel %d.", id);
@@ -213,6 +220,7 @@ int dmamux_stm32_stop(const struct device *dev, uint32_t id)
 		return -EINVAL;
 	}
 
+	printf("dmamux_stm32_stop\n");
 	if (dma_device->stop(dev_config->mux_channels[id].dev_dma,
 		dev_config->mux_channels[id].dma_id) != 0) {
 		LOG_ERR("cannot stop the dmamux channel %d.", id);
@@ -235,6 +243,7 @@ int dmamux_stm32_reload(const struct device *dev, uint32_t id,
 		return -EINVAL;
 	}
 
+	printf("dmamux_stm32_reload\n");
 	if (dma_device->reload(dev_config->mux_channels[id].dev_dma,
 		dev_config->mux_channels[id].dma_id,
 		src, dst, size) != 0) {
@@ -283,23 +292,28 @@ static int dmamux_stm32_init(const struct device *dev)
 	/* DMAs assigned to DMAMUX channels at build time might not be ready. */
 #if DT_NODE_HAS_STATUS(DT_NODELABEL(dma1), okay)
 	if (device_is_ready(DEVICE_DT_GET(DT_NODELABEL(dma1))) == false) {
+		printf("dmamux_stm32_init: dma1 is NOT ready\n");
 		return -ENODEV;
 	}
+	printf("dmamux_stm32_init: dma1 is ready\n");
 #endif
 #if DT_NODE_HAS_STATUS(DT_NODELABEL(dma2), okay)
 	if (device_is_ready(DEVICE_DT_GET(DT_NODELABEL(dma2))) == false) {
+		printf("dmamux_stm32_init: dma2 is NOT ready\n");
 		return -ENODEV;
 	}
+	printf("dmamux_stm32_init: dma2 is ready\n");
 #endif
 
-#ifdef CONFIG_BDMAMUX_STM32
-#if DT_NODE_HAS_STATUS(DT_NODELABEL(bdma), okay)
-	if (device_is_ready(DEVICE_DT_GET(DT_NODELABEL(bdma))) == false) {
+#ifdef CONFIG_BDMA_STM32
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(bdma1), okay)
+	if (device_is_ready(DEVICE_DT_GET(DT_NODELABEL(bdma1))) == false) {
+		printf("dmamux_stm32_init: bdma1 is NOT ready\n");
 		return -ENODEV;
 	}
+	printf("dmamux_stm32_init: bdma1 is ready\n");
 #endif
 #endif
-
 	return 0;
 }
 

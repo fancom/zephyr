@@ -38,13 +38,13 @@ struct bdma_stm32_config {
 	bool support_m2m;
 	uint32_t base;
 	uint32_t max_streams;
-#ifdef CONFIG_BDMAMUX_STM32
+#ifdef CONFIG_DMAMUX_STM32
 	uint8_t offset; /* position in the list of bdmamux channel list */
 #endif
 	struct bdma_stm32_stream *streams;
 };
 
-#if !defined(CONFIG_BDMAMUX_STM32)
+#if !defined(CONFIG_DMAMUX_STM32)
 uint32_t bdma_stm32_slot_to_channel(uint32_t id);
 #endif
 
@@ -64,12 +64,12 @@ bool stm32_bdma_is_irq_active(BDMA_TypeDef *bdma, uint32_t id);
 bool stm32_bdma_is_irq_happened(BDMA_TypeDef *bdma, uint32_t id);
 bool stm32_bdma_is_unexpected_irq_happened(BDMA_TypeDef *bdma, uint32_t id);
 
-#if !defined(CONFIG_BDMAMUX_STM32)
+#if !defined(CONFIG_DMAMUX_STM32)
 void stm32_dma_config_channel_function(BDMA_TypeDef *bdma, uint32_t id,
 						uint32_t slot);
 #endif
 
-#ifdef CONFIG_BDMAMUX_STM32
+#ifdef CONFIG_DMAMUX_STM32
 /* bdma_stm32_ api functions are exported to the bdmamux_stm32 */
 #define BDMA_STM32_EXPORT_API
 int bdma_stm32_configure(const struct device *dev, uint32_t id,
@@ -82,6 +82,6 @@ int bdma_stm32_get_status(const struct device *dev, uint32_t id,
 				struct dma_status *stat);
 #else
 #define BDMA_STM32_EXPORT_API static
-#endif /* CONFIG_BDMAMUX_STM32 */
+#endif /* CONFIG_DMAMUX_STM32 */
 
 #endif /* BDMA_STM32_H_*/
