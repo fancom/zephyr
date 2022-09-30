@@ -437,6 +437,8 @@ BDMA_STM32_EXPORT_API int bdma_stm32_configure(const struct device *dev,
 	LL_BDMA_InitTypeDef BDMA_InitStruct;
 	int ret;
 
+	//printf("bdma_stm32_configure id: %d\n", id);
+
 	/* Check potential BDMA override */
 	if (config->linked_channel == STM32_DMA_HAL_OVERRIDE) {
 		/* BDMA channel is overridden by HAL BDMA
@@ -606,7 +608,7 @@ BDMA_STM32_EXPORT_API int bdma_stm32_configure(const struct device *dev,
 		}
 	}
 
-	printf("dma-slot: %d\n", config->dma_slot);
+	//printf("dma-slot: %d\n", config->dma_slot);
 	BDMA_InitStruct.Channel = bdma_stm32_slot_to_channel(config->dma_slot);
 #endif
 
