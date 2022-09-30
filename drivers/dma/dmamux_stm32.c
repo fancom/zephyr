@@ -142,6 +142,9 @@ int dmamux_stm32_configure(const struct device *dev, uint32_t id,
 	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev_config);
 	assert(dma_device != (void*)0);
 
+	printf("dmamux_stm32_configure id: %d\n", id);
+	printf("dmamux_stm32_configure slot: %d\n", config->dma_slot);
+
 	/*
 	 * request line ID for this mux channel is stored
 	 * in the dma_slot parameter
@@ -170,7 +173,6 @@ int dmamux_stm32_configure(const struct device *dev, uint32_t id,
 	 * This dmamux channel 'id' is now used for this peripheral request
 	 * It gives this mux request ID to the dma through the config.dma_slot
 	 */
-	printf("dmamux_stm32_configure\n");
 	if (dma_device->configure(dev_config->mux_channels[id].dev_dma,
 			dev_config->mux_channels[id].dma_id, config) != 0) {
 		LOG_ERR("cannot configure the dmamux.");
@@ -198,7 +200,7 @@ int dmamux_stm32_start(const struct device *dev, uint32_t id)
 		return -EINVAL;
 	}
 
-	printf("dmamux_stm32_start\n");
+	printf("dmamux_stm32_start, id: %d\n", id);
 	if (dma_device->start(dev_config->mux_channels[id].dev_dma,
 		dev_config->mux_channels[id].dma_id) != 0) {
 		LOG_ERR("cannot start the dmamux channel %d.", id);
