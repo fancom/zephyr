@@ -95,6 +95,12 @@ static bool stm32_bdma_is_tc_irq_active(BDMA_TypeDef *dma, uint32_t id)
 	       bdma_stm32_is_tc_active(dma, id);
 }
 
+static bool stm32_bdma_is_ht_irq_active(BDMA_TypeDef *dma, uint32_t id)
+{
+	return LL_BDMA_IsEnabledIT_HT(dma, bdma_stm32_id_to_channel(id)) &&
+	       bdma_stm32_is_ht_active(dma, id);
+}
+
 static void bdma_stm32_irq_handler(const struct device *dev, uint32_t id)
 {
 	const struct bdma_stm32_config *config = dev->config;
@@ -117,7 +123,7 @@ static void bdma_stm32_irq_handler(const struct device *dev, uint32_t id)
 	}
 
 	/* the dma stream id is in range from STREAM_OFFSET..<dma-requests> */
-	if (stm32_bdma_is_irq_active(dma, id)) {
+	if (stm32_bdma_is_ht_irq_active(dma, id)) {
 		/* Let HAL DMA handle flags on its own */
 		if (!stream->hal_override) {
 			bdma_stm32_clear_ht(dma, id);
@@ -371,12 +377,6 @@ void bdma_stm32_clear_te(BDMA_TypeDef *BDMAx, uint32_t id)
 	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
 
 	func[id](BDMAx);
-}
-
-static bool stm32_bdma_is_ht_irq_active(BDMA_TypeDef *dma, uint32_t id)
-{
-	return LL_BDMA_IsEnabledIT_HT(dma, bdma_stm32_id_to_channel(id)) &&
-	       bdma_stm32_is_ht_active(dma, id);
 }
 
 static bool stm32_bdma_is_te_irq_active(BDMA_TypeDef *dma, uint32_t id)
