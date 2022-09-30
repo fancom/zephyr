@@ -40,13 +40,13 @@ static uint32_t bdma_stm32_id_to_channel(uint32_t id)
 {
 	static const uint32_t channel_nr[] = {
 		LL_BDMA_CHANNEL_0,
-		LL_BDMA_CHANNEL_0,
-		LL_BDMA_CHANNEL_0,
-		LL_BDMA_CHANNEL_0,
-		LL_BDMA_CHANNEL_0,
-		LL_BDMA_CHANNEL_0,
-		LL_BDMA_CHANNEL_0,
-		LL_BDMA_CHANNEL_0,
+		LL_BDMA_CHANNEL_1,
+		LL_BDMA_CHANNEL_2,
+		LL_BDMA_CHANNEL_3,
+		LL_BDMA_CHANNEL_4,
+		LL_BDMA_CHANNEL_5,
+		LL_BDMA_CHANNEL_6,
+		LL_BDMA_CHANNEL_7,
 	};
 
 	__ASSERT_NO_MSG(id < ARRAY_SIZE(channel_nr));
@@ -392,7 +392,7 @@ bool stm32_bdma_is_irq_active(BDMA_TypeDef *bdma, uint32_t id)
 	       stm32_bdma_is_te_irq_active(bdma, id);
 }
 
-void stm32_bdma_enable_channel(BDMA_TypeDef *bdma, uint32_t id)
+static void stm32_bdma_enable_channel(BDMA_TypeDef *bdma, uint32_t id)
 {
 	LL_BDMA_EnableChannel(bdma, bdma_stm32_id_to_channel(id));
 }
@@ -606,6 +606,7 @@ BDMA_STM32_EXPORT_API int bdma_stm32_configure(const struct device *dev,
 		}
 	}
 
+	printf("dma-slot: %d\n", config->dma_slot);
 	BDMA_InitStruct.Channel = bdma_stm32_slot_to_channel(config->dma_slot);
 #endif
 
