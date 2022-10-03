@@ -44,28 +44,42 @@ struct bdma_stm32_config {
 	struct bdma_stm32_stream *streams;
 };
 
+uint32_t bdma_stm32_id_to_channel(uint32_t id);
 #if !defined(CONFIG_DMAMUX_STM32)
 uint32_t bdma_stm32_slot_to_channel(uint32_t id);
 #endif
 
-typedef void (*bdma_stm32_clear_flag_func)(BDMA_TypeDef *BDMAx);
-typedef uint32_t (*bdma_stm32_check_flag_func)(BDMA_TypeDef *BDMAx);
+typedef void (*bdma_stm32_clear_flag_func)(BDMA_TypeDef *DMAx);
+typedef uint32_t (*bdma_stm32_check_flag_func)(BDMA_TypeDef *DMAx);
 
-bool bdma_stm32_is_gi_active(BDMA_TypeDef *BDMAx, uint32_t id);
-void bdma_stm32_clear_gi(BDMA_TypeDef *BDMAx, uint32_t id);
-bool bdma_stm32_is_tc_active(BDMA_TypeDef *BDMAx, uint32_t id);
-void bdma_stm32_clear_tc(BDMA_TypeDef *BDMAx, uint32_t id);
-bool bdma_stm32_is_ht_active(BDMA_TypeDef *BDMAx, uint32_t id);
-void bdma_stm32_clear_ht(BDMA_TypeDef *BDMAx, uint32_t id);
-bool bdma_stm32_is_te_active(BDMA_TypeDef *BDMAx, uint32_t id);
-void bdma_stm32_clear_te(BDMA_TypeDef *BDMAx, uint32_t id);
 
-bool stm32_bdma_is_irq_active(BDMA_TypeDef *bdma, uint32_t id);
-bool stm32_bdma_is_irq_happened(BDMA_TypeDef *bdma, uint32_t id);
-bool stm32_bdma_is_unexpected_irq_happened(BDMA_TypeDef *bdma, uint32_t id);
+#ifdef CONFIG_DMA_STM32_V1
+bool bdma_stm32_is_dme_active(BDMA_TypeDef *DMAx, uint32_t id);
+void bdma_stm32_clear_dme(BDMA_TypeDef *DMAx, uint32_t id);
+bool bdma_stm32_is_fe_active(BDMA_TypeDef *DMAx, uint32_t id);
+void bdma_stm32_clear_fe(BDMA_TypeDef *DMAx, uint32_t id);
+#endif
+
+bool bdma_stm32_is_gi_active(BDMA_TypeDef *DMAx, uint32_t id);
+void bdma_stm32_clear_gi(BDMA_TypeDef *DMAx, uint32_t id);
+
+void bdma_stm32_clear_tc(BDMA_TypeDef *DMAx, uint32_t id);
+void bdma_stm32_clear_ht(BDMA_TypeDef *DMAx, uint32_t id);
+bool bdma_stm32_is_te_active(BDMA_TypeDef *DMAx, uint32_t id);
+void bdma_stm32_clear_te(BDMA_TypeDef *DMAx, uint32_t id);
+
+bool stm32_bdma_is_irq_active(BDMA_TypeDef *dma, uint32_t id);
+bool stm32_bdma_is_ht_irq_active(BDMA_TypeDef *ma, uint32_t id);
+bool stm32_bdma_is_tc_irq_active(BDMA_TypeDef *ma, uint32_t id);
+
+void stm32_bdma_dump_channel_irq(BDMA_TypeDef *dma, uint32_t id);
+void stm32_bdma_clear_channel_irq(BDMA_TypeDef *dma, uint32_t id);
+bool stm32_bdma_is_irq_happened(BDMA_TypeDef *dma, uint32_t id);
+void stm32_bdma_enable_channel(BDMA_TypeDef *dma, uint32_t id);
+int stm32_bdma_disable_channel(BDMA_TypeDef *dma, uint32_t id);
 
 #if !defined(CONFIG_DMAMUX_STM32)
-void stm32_dma_config_channel_function(BDMA_TypeDef *bdma, uint32_t id,
+void stm32_dma_config_channel_function(BDMA_TypeDef *dma, uint32_t id,
 						uint32_t slot);
 #endif
 

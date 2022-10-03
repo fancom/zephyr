@@ -36,7 +36,7 @@ static uint32_t table_p_size[] = {
 	LL_BDMA_PDATAALIGN_WORD,
 };
 
-static uint32_t bdma_stm32_id_to_channel(uint32_t id)
+uint32_t bdma_stm32_id_to_channel(uint32_t id)
 {
 	static const uint32_t channel_nr[] = {
 		LL_BDMA_CHANNEL_0,
@@ -74,31 +74,22 @@ uint32_t bdma_stm32_slot_to_channel(uint32_t slot)
 }
 #endif
 
-static void bdma_stm32_dump_stream_irq(const struct device *dev, uint32_t id)
-{
-}
-
-static void bdma_stm32_clear_stream_irq(const struct device *dev, uint32_t id)
+static void bdma_stm32_dump_channel_irq(const struct device *dev, uint32_t id)
 {
 	const struct bdma_stm32_config *config = dev->config;
-	BDMA_TypeDef *bdma = (BDMA_TypeDef *)(config->base);
+	BDMA_TypeDef *dma = (BDMA_TypeDef *)(config->base);
 
-	bdma_stm32_clear_gi(bdma, id);
-	bdma_stm32_clear_tc(bdma, id);
-	bdma_stm32_clear_ht(bdma, id);
-	bdma_stm32_clear_te(bdma, id);
+	stm32_bdma_dump_channel_irq(dma, id);
 }
 
-static bool stm32_bdma_is_tc_irq_active(BDMA_TypeDef *dma, uint32_t id)
+static void bdma_stm32_clear_channel_irq(const struct device *dev, uint32_t id)
 {
-	return LL_BDMA_IsEnabledIT_TC(dma, bdma_stm32_id_to_channel(id)) &&
-	       bdma_stm32_is_tc_active(dma, id);
-}
+	const struct bdma_stm32_config *config = dev->config;
+	BDMA_TypeDef *dma = (BDMA_TypeDef *)(config->base);
 
-static bool stm32_bdma_is_ht_irq_active(BDMA_TypeDef *dma, uint32_t id)
-{
-	return LL_BDMA_IsEnabledIT_HT(dma, bdma_stm32_id_to_channel(id)) &&
-	       bdma_stm32_is_ht_active(dma, id);
+	bdma_stm32_clear_tc(dma, id);
+	bdma_stm32_clear_ht(dma, id);
+	stm32_bdma_clear_channel_irq(dma, id);
 }
 
 static void bdma_stm32_irq_handler(const struct device *dev, uint32_t id)
@@ -138,14 +129,10 @@ static void bdma_stm32_irq_handler(const struct device *dev, uint32_t id)
 			bdma_stm32_clear_tc(dma, id);
 		}
 		stream->bdma_callback(dev, stream->user_data, callback_arg, 0);
-	} else if (stm32_dma_is_unexpected_irq_happened(dma, id)) {
-		LOG_ERR("Unexpected irq happened.");
-		stream->bdma_callback(dev, stream->user_data,
-				     callback_arg, -EIO);
 	} else {
 		LOG_ERR("Transfer Error.");
-		bdma_stm32_dump_stream_irq(dev, id);
-		bdma_stm32_clear_stream_irq(dev, id);
+		bdma_stm32_dump_channel_irq(dev, id);
+		bdma_stm32_clear_channel_irq(dev, id);
 		stream->bdma_callback(dev, stream->user_data,
 				     callback_arg, -EIO);
 	}
@@ -235,185 +222,12 @@ static int bdma_stm32_get_periph_increment(enum dma_addr_adj increment,
 	return 0;
 }
 
-bool bdma_stm32_is_gi_active(BDMA_TypeDef *BDMAx, uint32_t id)
-{
-	static const bdma_stm32_check_flag_func func[] = {
-		LL_BDMA_IsActiveFlag_GI0,
-		LL_BDMA_IsActiveFlag_GI1,
-		LL_BDMA_IsActiveFlag_GI2,
-		LL_BDMA_IsActiveFlag_GI3,
-		LL_BDMA_IsActiveFlag_GI4,
-		LL_BDMA_IsActiveFlag_GI5,
-		LL_BDMA_IsActiveFlag_GI6,
-		LL_BDMA_IsActiveFlag_GI7,
-	};
-
-	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
-
-	return func[id](BDMAx);
-}
-
-void bdma_stm32_clear_gi(BDMA_TypeDef *BDMAx, uint32_t id)
-{
-	static const bdma_stm32_clear_flag_func func[] = {
-		LL_BDMA_ClearFlag_GI0,
-		LL_BDMA_ClearFlag_GI1,
-		LL_BDMA_ClearFlag_GI2,
-		LL_BDMA_ClearFlag_GI3,
-		LL_BDMA_ClearFlag_GI4,
-		LL_BDMA_ClearFlag_GI5,
-		LL_BDMA_ClearFlag_GI6,
-		LL_BDMA_ClearFlag_GI7,
-	};
-
-	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
-
-	func[id](BDMAx);
-}
-
-bool bdma_stm32_is_tc_active(BDMA_TypeDef *BDMAx, uint32_t id)
-{
-	static const bdma_stm32_check_flag_func func[] = {
-		LL_BDMA_IsActiveFlag_TC0,
-		LL_BDMA_IsActiveFlag_TC1,
-		LL_BDMA_IsActiveFlag_TC2,
-		LL_BDMA_IsActiveFlag_TC3,
-		LL_BDMA_IsActiveFlag_TC4,
-		LL_BDMA_IsActiveFlag_TC5,
-		LL_BDMA_IsActiveFlag_TC6,
-		LL_BDMA_IsActiveFlag_TC7,
-	};
-
-	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
-
-	return func[id](BDMAx);
-}
-
-void bdma_stm32_clear_tc(BDMA_TypeDef *BDMAx, uint32_t id)
-{
-	static const bdma_stm32_clear_flag_func func[] = {
-		LL_BDMA_ClearFlag_TC0,
-		LL_BDMA_ClearFlag_TC1,
-		LL_BDMA_ClearFlag_TC2,
-		LL_BDMA_ClearFlag_TC3,
-		LL_BDMA_ClearFlag_TC4,
-		LL_BDMA_ClearFlag_TC5,
-		LL_BDMA_ClearFlag_TC6,
-		LL_BDMA_ClearFlag_TC7,
-	};
-
-	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
-
-	func[id](BDMAx);
-}
-
-bool bdma_stm32_is_ht_active(BDMA_TypeDef *BDMAx, uint32_t id)
-{
-	static const bdma_stm32_check_flag_func func[] = {
-		LL_BDMA_IsActiveFlag_HT0,
-		LL_BDMA_IsActiveFlag_HT1,
-		LL_BDMA_IsActiveFlag_HT2,
-		LL_BDMA_IsActiveFlag_HT3,
-		LL_BDMA_IsActiveFlag_HT4,
-		LL_BDMA_IsActiveFlag_HT5,
-		LL_BDMA_IsActiveFlag_HT6,
-		LL_BDMA_IsActiveFlag_HT7,
-	};
-
-	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
-
-	return func[id](BDMAx);
-}
-
-void bdma_stm32_clear_ht(BDMA_TypeDef *BDMAx, uint32_t id)
-{
-	static const bdma_stm32_clear_flag_func func[] = {
-		LL_BDMA_ClearFlag_HT0,
-		LL_BDMA_ClearFlag_HT1,
-		LL_BDMA_ClearFlag_HT2,
-		LL_BDMA_ClearFlag_HT3,
-		LL_BDMA_ClearFlag_HT4,
-		LL_BDMA_ClearFlag_HT5,
-		LL_BDMA_ClearFlag_HT6,
-		LL_BDMA_ClearFlag_HT7,
-	};
-
-	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
-
-	func[id](BDMAx);
-}
-
-bool bdma_stm32_is_te_active(BDMA_TypeDef *BDMAx, uint32_t id)
-{
-	static const bdma_stm32_check_flag_func func[] = {
-		LL_BDMA_IsActiveFlag_TE0,
-		LL_BDMA_IsActiveFlag_TE1,
-		LL_BDMA_IsActiveFlag_TE2,
-		LL_BDMA_IsActiveFlag_TE3,
-		LL_BDMA_IsActiveFlag_TE4,
-		LL_BDMA_IsActiveFlag_TE5,
-		LL_BDMA_IsActiveFlag_TE6,
-		LL_BDMA_IsActiveFlag_TE7,
-	};
-
-	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
-
-	return func[id](BDMAx);
-}
-
-void bdma_stm32_clear_te(BDMA_TypeDef *BDMAx, uint32_t id)
-{
-	static const bdma_stm32_clear_flag_func func[] = {
-		LL_BDMA_ClearFlag_TE0,
-		LL_BDMA_ClearFlag_TE1,
-		LL_BDMA_ClearFlag_TE2,
-		LL_BDMA_ClearFlag_TE3,
-		LL_BDMA_ClearFlag_TE4,
-		LL_BDMA_ClearFlag_TE5,
-		LL_BDMA_ClearFlag_TE6,
-		LL_BDMA_ClearFlag_TE7,
-	};
-
-	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
-
-	func[id](BDMAx);
-}
-
-static bool stm32_bdma_is_te_irq_active(BDMA_TypeDef *dma, uint32_t id)
-{
-	return LL_BDMA_IsEnabledIT_TE(dma, bdma_stm32_id_to_channel(id)) &&
-	       bdma_stm32_is_te_active(dma, id);
-}
-
-bool stm32_bdma_is_irq_active(BDMA_TypeDef *bdma, uint32_t id)
-{
-	return stm32_bdma_is_tc_irq_active(bdma, id) ||
-	       stm32_bdma_is_ht_irq_active(bdma, id) ||
-	       stm32_bdma_is_te_irq_active(bdma, id);
-}
-
-static void stm32_bdma_enable_channel(BDMA_TypeDef *bdma, uint32_t id)
-{
-	LL_BDMA_EnableChannel(bdma, bdma_stm32_id_to_channel(id));
-}
-
-int stm32_bdma_disable_stream(BDMA_TypeDef *bdma, uint32_t id)
-{
-	LL_BDMA_DisableChannel(bdma, bdma_stm32_id_to_channel(id));
-
-	if (!LL_BDMA_IsEnabledChannel(bdma, bdma_stm32_id_to_channel(id))) {
-		return 0;
-	}
-
-	return -EAGAIN;
-}
-
-static int bdma_stm32_disable_stream(BDMA_TypeDef *bdma, uint32_t id)
+static int bdma_stm32_disable_channel(BDMA_TypeDef *bdma, uint32_t id)
 {
 	int count = 0;
 
 	for (;;) {
-		if (stm32_bdma_disable_stream(bdma, id) == 0) {
+		if (stm32_bdma_disable_channel(bdma, id) == 0) {
 			return 0;
 		}
 		/* After trying for 5 seconds, give up */
@@ -460,12 +274,12 @@ BDMA_STM32_EXPORT_API int bdma_stm32_configure(const struct device *dev,
 		return -EBUSY;
 	}
 
-	if (bdma_stm32_disable_stream(bdma, id) != 0) {
-		LOG_ERR("could not disable bdma stream %d.", id);
+	if (bdma_stm32_disable_channel(bdma, id) != 0) {
+		LOG_ERR("could not disable bdma channel %d.", id);
 		return -EBUSY;
 	}
 
-	bdma_stm32_clear_stream_irq(dev, id);
+	bdma_stm32_clear_channel_irq(dev, id);
 
 	if (config->head_block->block_size > BDMA_STM32_MAX_DATA_ITEMS) {
 		LOG_ERR("Data size too big: %d\n",
@@ -667,7 +481,7 @@ BDMA_STM32_EXPORT_API int bdma_stm32_reload(const struct device *dev, uint32_t i
 
 	stream = &config->streams[id];
 
-	if (bdma_stm32_disable_stream(bdma, id) != 0) {
+	if (bdma_stm32_disable_channel(bdma, id) != 0) {
 		return -EBUSY;
 	}
 
@@ -708,7 +522,7 @@ BDMA_STM32_EXPORT_API int bdma_stm32_start(const struct device *dev, uint32_t id
 		return -EINVAL;
 	}
 
-	bdma_stm32_clear_stream_irq(dev, id);
+	bdma_stm32_clear_channel_irq(dev, id);
 
 	stm32_bdma_enable_channel(bdma, id);
 
@@ -732,8 +546,8 @@ BDMA_STM32_EXPORT_API int bdma_stm32_stop(const struct device *dev, uint32_t id)
 #if defined(CONFIG_BDMA_STM32_V1)
 	stm32_bdma_disable_fifo_irq(bdma, id);
 #endif
-	bdma_stm32_disable_stream(bdma, id);
-	bdma_stm32_clear_stream_irq(dev, id);
+	bdma_stm32_disable_channel(bdma, id);
+	bdma_stm32_clear_channel_irq(dev, id);
 
 	/* Finally, flag stream as free */
 	stream->busy = false;

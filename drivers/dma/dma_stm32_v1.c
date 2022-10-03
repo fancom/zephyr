@@ -9,6 +9,9 @@
  */
 
 #include "dma_stm32.h"
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+#include "bdma_stm32.h"
+#endif
 
 #define LOG_LEVEL CONFIG_DMA_LOG_LEVEL
 #include <logging/log.h>
@@ -73,6 +76,26 @@ void dma_stm32_clear_ht(DMA_TypeDef *DMAx, uint32_t id)
 	func[id](DMAx);
 }
 
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+void bdma_stm32_clear_ht(BDMA_TypeDef *DMAx, uint32_t id)
+{
+	static const bdma_stm32_clear_flag_func func[] = {
+		LL_BDMA_ClearFlag_HT0,
+		LL_BDMA_ClearFlag_HT1,
+		LL_BDMA_ClearFlag_HT2,
+		LL_BDMA_ClearFlag_HT3,
+		LL_BDMA_ClearFlag_HT4,
+		LL_BDMA_ClearFlag_HT5,
+		LL_BDMA_ClearFlag_HT6,
+		LL_BDMA_ClearFlag_HT7,
+	};
+
+	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
+
+	func[id](DMAx);
+}
+#endif
+
 void dma_stm32_clear_tc(DMA_TypeDef *DMAx, uint32_t id)
 {
 	static const dma_stm32_clear_flag_func func[] = {
@@ -90,6 +113,26 @@ void dma_stm32_clear_tc(DMA_TypeDef *DMAx, uint32_t id)
 
 	func[id](DMAx);
 }
+
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+void bdma_stm32_clear_tc(BDMA_TypeDef *DMAx, uint32_t id)
+{
+	static const bdma_stm32_clear_flag_func func[] = {
+		LL_BDMA_ClearFlag_TC0,
+		LL_BDMA_ClearFlag_TC1,
+		LL_BDMA_ClearFlag_TC2,
+		LL_BDMA_ClearFlag_TC3,
+		LL_BDMA_ClearFlag_TC4,
+		LL_BDMA_ClearFlag_TC5,
+		LL_BDMA_ClearFlag_TC6,
+		LL_BDMA_ClearFlag_TC7,
+	};
+
+	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
+
+	func[id](DMAx);
+}
+#endif
 
 bool dma_stm32_is_ht_active(DMA_TypeDef *DMAx, uint32_t id)
 {
@@ -109,6 +152,26 @@ bool dma_stm32_is_ht_active(DMA_TypeDef *DMAx, uint32_t id)
 	return func[id](DMAx);
 }
 
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+bool bdma_stm32_is_ht_active(BDMA_TypeDef *DMAx, uint32_t id)
+{
+	static const bdma_stm32_check_flag_func func[] = {
+		LL_BDMA_IsActiveFlag_HT0,
+		LL_BDMA_IsActiveFlag_HT1,
+		LL_BDMA_IsActiveFlag_HT2,
+		LL_BDMA_IsActiveFlag_HT3,
+		LL_BDMA_IsActiveFlag_HT4,
+		LL_BDMA_IsActiveFlag_HT5,
+		LL_BDMA_IsActiveFlag_HT6,
+		LL_BDMA_IsActiveFlag_HT7,
+	};
+
+	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
+
+	return func[id](DMAx);
+}
+#endif
+
 bool dma_stm32_is_tc_active(DMA_TypeDef *DMAx, uint32_t id)
 {
 	static const dma_stm32_check_flag_func func[] = {
@@ -127,6 +190,26 @@ bool dma_stm32_is_tc_active(DMA_TypeDef *DMAx, uint32_t id)
 	return func[id](DMAx);
 }
 
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+bool bdma_stm32_is_tc_active(BDMA_TypeDef *DMAx, uint32_t id)
+{
+	static const bdma_stm32_check_flag_func func[] = {
+		LL_BDMA_IsActiveFlag_TC0,
+		LL_BDMA_IsActiveFlag_TC1,
+		LL_BDMA_IsActiveFlag_TC2,
+		LL_BDMA_IsActiveFlag_TC3,
+		LL_BDMA_IsActiveFlag_TC4,
+		LL_BDMA_IsActiveFlag_TC5,
+		LL_BDMA_IsActiveFlag_TC6,
+		LL_BDMA_IsActiveFlag_TC7,
+	};
+
+	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
+
+	return func[id](DMAx);
+}
+#endif
+
 void dma_stm32_clear_te(DMA_TypeDef *DMAx, uint32_t id)
 {
 	static const dma_stm32_clear_flag_func func[] = {
@@ -144,6 +227,26 @@ void dma_stm32_clear_te(DMA_TypeDef *DMAx, uint32_t id)
 
 	func[id](DMAx);
 }
+
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+void bdma_stm32_clear_te(BDMA_TypeDef *DMAx, uint32_t id)
+{
+	static const bdma_stm32_clear_flag_func func[] = {
+		LL_BDMA_ClearFlag_TE0,
+		LL_BDMA_ClearFlag_TE1,
+		LL_BDMA_ClearFlag_TE2,
+		LL_BDMA_ClearFlag_TE3,
+		LL_BDMA_ClearFlag_TE4,
+		LL_BDMA_ClearFlag_TE5,
+		LL_BDMA_ClearFlag_TE6,
+		LL_BDMA_ClearFlag_TE7,
+	};
+
+	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
+
+	func[id](DMAx);
+}
+#endif
 
 void dma_stm32_clear_dme(DMA_TypeDef *DMAx, uint32_t id)
 {
@@ -181,6 +284,26 @@ void dma_stm32_clear_fe(DMA_TypeDef *DMAx, uint32_t id)
 	func[id](DMAx);
 }
 
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+void bdma_stm32_clear_gi(BDMA_TypeDef *DMAx, uint32_t id)
+{
+	static const bdma_stm32_clear_flag_func func[] = {
+		LL_BDMA_ClearFlag_GI0,
+		LL_BDMA_ClearFlag_GI1,
+		LL_BDMA_ClearFlag_GI2,
+		LL_BDMA_ClearFlag_GI3,
+		LL_BDMA_ClearFlag_GI4,
+		LL_BDMA_ClearFlag_GI5,
+		LL_BDMA_ClearFlag_GI6,
+		LL_BDMA_ClearFlag_GI7,
+	};
+
+	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
+
+	func[id](DMAx);
+}
+#endif
+
 bool dma_stm32_is_te_active(DMA_TypeDef *DMAx, uint32_t id)
 {
 	static const dma_stm32_check_flag_func func[] = {
@@ -198,6 +321,26 @@ bool dma_stm32_is_te_active(DMA_TypeDef *DMAx, uint32_t id)
 
 	return func[id](DMAx);
 }
+
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+bool bdma_stm32_is_te_active(BDMA_TypeDef *DMAx, uint32_t id)
+{
+	static const bdma_stm32_check_flag_func func[] = {
+		LL_BDMA_IsActiveFlag_TE0,
+		LL_BDMA_IsActiveFlag_TE1,
+		LL_BDMA_IsActiveFlag_TE2,
+		LL_BDMA_IsActiveFlag_TE3,
+		LL_BDMA_IsActiveFlag_TE4,
+		LL_BDMA_IsActiveFlag_TE5,
+		LL_BDMA_IsActiveFlag_TE6,
+		LL_BDMA_IsActiveFlag_TE7,
+	};
+
+	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
+
+	return func[id](DMAx);
+}
+#endif
 
 bool dma_stm32_is_dme_active(DMA_TypeDef *DMAx, uint32_t id)
 {
@@ -217,6 +360,9 @@ bool dma_stm32_is_dme_active(DMA_TypeDef *DMAx, uint32_t id)
 	return func[id](DMAx);
 }
 
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+#endif
+
 bool dma_stm32_is_fe_active(DMA_TypeDef *DMAx, uint32_t id)
 {
 	static const dma_stm32_check_flag_func func[] = {
@@ -235,6 +381,26 @@ bool dma_stm32_is_fe_active(DMA_TypeDef *DMAx, uint32_t id)
 	return func[id](DMAx);
 }
 
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+bool bdma_stm32_is_gi_active(BDMA_TypeDef *DMAx, uint32_t id)
+{
+	static const bdma_stm32_check_flag_func func[] = {
+		LL_BDMA_IsActiveFlag_GI0,
+		LL_BDMA_IsActiveFlag_GI1,
+		LL_BDMA_IsActiveFlag_GI2,
+		LL_BDMA_IsActiveFlag_GI3,
+		LL_BDMA_IsActiveFlag_GI4,
+		LL_BDMA_IsActiveFlag_GI5,
+		LL_BDMA_IsActiveFlag_GI6,
+		LL_BDMA_IsActiveFlag_GI7,
+	};
+
+	__ASSERT_NO_MSG(id < ARRAY_SIZE(func));
+
+	return func[id](DMAx);
+}
+#endif
+
 void stm32_dma_dump_stream_irq(DMA_TypeDef *dma, uint32_t id)
 {
 	LOG_INF("tc: %d, ht: %d, te: %d, dme: %d, fe: %d",
@@ -245,11 +411,30 @@ void stm32_dma_dump_stream_irq(DMA_TypeDef *dma, uint32_t id)
 		dma_stm32_is_fe_active(dma, id));
 }
 
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+void stm32_bdma_dump_channel_irq(BDMA_TypeDef *dma, uint32_t id)
+{
+	LOG_INF("te: %d, ht: %d, tc: %d, gi: %d",
+		bdma_stm32_is_te_active(dma, id),
+		bdma_stm32_is_ht_active(dma, id),
+		bdma_stm32_is_tc_active(dma, id),
+		bdma_stm32_is_gi_active(dma, id));
+}
+#endif
+
 inline bool stm32_dma_is_tc_irq_active(DMA_TypeDef *dma, uint32_t id)
 {
 	return LL_DMA_IsEnabledIT_TC(dma, dma_stm32_id_to_stream(id)) &&
 	       dma_stm32_is_tc_active(dma, id);
 }
+
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+inline bool stm32_bdma_is_tc_irq_active(BDMA_TypeDef *dma, uint32_t id)
+{
+	return LL_BDMA_IsEnabledIT_TC(dma, bdma_stm32_id_to_channel(id)) &&
+	       bdma_stm32_is_tc_active(dma, id);
+}
+#endif
 
 inline bool stm32_dma_is_ht_irq_active(DMA_TypeDef *dma, uint32_t id)
 {
@@ -257,11 +442,27 @@ inline bool stm32_dma_is_ht_irq_active(DMA_TypeDef *dma, uint32_t id)
 	       dma_stm32_is_ht_active(dma, id);
 }
 
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+inline bool stm32_bdma_is_ht_irq_active(BDMA_TypeDef *dma, uint32_t id)
+{
+	return LL_BDMA_IsEnabledIT_HT(dma, bdma_stm32_id_to_channel(id)) &&
+	       bdma_stm32_is_ht_active(dma, id);
+}
+#endif
+
 static inline bool stm32_dma_is_te_irq_active(DMA_TypeDef *dma, uint32_t id)
 {
 	return LL_DMA_IsEnabledIT_TE(dma, dma_stm32_id_to_stream(id)) &&
 	       dma_stm32_is_te_active(dma, id);
 }
+
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+static inline bool stm32_bdma_is_te_irq_active(BDMA_TypeDef *dma, uint32_t id)
+{
+	return LL_BDMA_IsEnabledIT_TE(dma, bdma_stm32_id_to_channel(id)) &&
+	       bdma_stm32_is_te_active(dma, id);
+}
+#endif
 
 static inline bool stm32_dma_is_dme_irq_active(DMA_TypeDef *dma, uint32_t id)
 {
@@ -284,12 +485,31 @@ bool stm32_dma_is_irq_active(DMA_TypeDef *dma, uint32_t id)
 	       stm32_dma_is_fe_irq_active(dma, id);
 }
 
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+bool stm32_bdma_is_irq_active(BDMA_TypeDef *dma, uint32_t id)
+{
+	return stm32_bdma_is_tc_irq_active(dma, id) ||
+	       stm32_bdma_is_ht_irq_active(dma, id) ||
+	       stm32_bdma_is_te_irq_active(dma, id);
+}
+#endif
+
 void stm32_dma_clear_stream_irq(DMA_TypeDef *dma, uint32_t id)
 {
 	dma_stm32_clear_te(dma, id);
 	dma_stm32_clear_dme(dma, id);
 	dma_stm32_clear_fe(dma, id);
 }
+
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+void stm32_bdma_clear_channel_irq(BDMA_TypeDef *dma, uint32_t id)
+{
+	bdma_stm32_clear_gi(dma, id);
+	bdma_stm32_clear_tc(dma, id);
+	bdma_stm32_clear_ht(dma, id);
+	bdma_stm32_clear_te(dma, id);
+}
+#endif
 
 bool stm32_dma_is_irq_happened(DMA_TypeDef *dma, uint32_t id)
 {
@@ -320,6 +540,13 @@ void stm32_dma_enable_stream(DMA_TypeDef *dma, uint32_t id)
 	LL_DMA_EnableStream(dma, dma_stm32_id_to_stream(id));
 }
 
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+void stm32_bdma_enable_channel(BDMA_TypeDef *dma, uint32_t id)
+{
+	LL_BDMA_EnableChannel(dma, bdma_stm32_id_to_channel(id));
+}
+#endif
+
 int stm32_dma_disable_stream(DMA_TypeDef *dma, uint32_t id)
 {
 	LL_DMA_DisableStream(dma, dma_stm32_id_to_stream(id));
@@ -330,6 +557,19 @@ int stm32_dma_disable_stream(DMA_TypeDef *dma, uint32_t id)
 
 	return -EAGAIN;
 }
+
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+int stm32_bdma_disable_channel(BDMA_TypeDef *dma, uint32_t id)
+{
+	LL_BDMA_DisableChannel(dma, bdma_stm32_id_to_channel(id));
+
+	if (!LL_BDMA_IsEnabledChannel(dma, bdma_stm32_id_to_channel(id))) {
+		return 0;
+	}
+
+	return -EAGAIN;
+}
+#endif
 
 void stm32_dma_disable_fifo_irq(DMA_TypeDef *dma, uint32_t id)
 {
