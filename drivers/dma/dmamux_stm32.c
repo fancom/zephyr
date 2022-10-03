@@ -120,7 +120,7 @@ static const struct dmamux_stm32_dma_fops dmamux2 = {
 };
 #endif
 
-struct dmamux_stm32_dma_fops* get_dma_fops(const struct dmamux_stm32_config* dev_config) {
+const struct dmamux_stm32_dma_fops* get_dma_fops(const struct dmamux_stm32_config* dev_config) {
 	if (dev_config->base == DT_INST_REG_ADDR(0)) {
 		return &dmamux1;
 	}
@@ -137,7 +137,7 @@ int dmamux_stm32_configure(const struct device *dev, uint32_t id,
 {
 	/* device is the dmamux, id is the dmamux channel from 0 */
 	const struct dmamux_stm32_config *dev_config = dev->config;
-	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev_config);
+	const struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev_config);
 	assert(dma_device != (void*)0);
 
 	/*
@@ -187,7 +187,7 @@ int dmamux_stm32_configure(const struct device *dev, uint32_t id,
 int dmamux_stm32_start(const struct device *dev, uint32_t id)
 {
 	const struct dmamux_stm32_config *dev_config = dev->config;
-	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev_config);
+	const struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev_config);
 	assert(dma_device != (void*)0);
 
 	/* check if this channel is valid */
@@ -208,7 +208,7 @@ int dmamux_stm32_start(const struct device *dev, uint32_t id)
 int dmamux_stm32_stop(const struct device *dev, uint32_t id)
 {
 	const struct dmamux_stm32_config *dev_config = dev->config;
-	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev_config);
+	const struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev_config);
 	assert(dma_device != (void*)0);
 
 	/* check if this channel is valid */
@@ -230,7 +230,7 @@ int dmamux_stm32_reload(const struct device *dev, uint32_t id,
 			    uint32_t src, uint32_t dst, size_t size)
 {
 	const struct dmamux_stm32_config *dev_config = dev->config;
-	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev_config);
+	const struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev_config);
 	assert(dma_device != (void*)0);
 
 	/* check if this channel is valid */
@@ -253,7 +253,7 @@ int dmamux_stm32_get_status(const struct device *dev, uint32_t id,
 				struct dma_status *stat)
 {
 	const struct dmamux_stm32_config *dev_config = dev->config;
-	struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev_config);
+	const struct dmamux_stm32_dma_fops* dma_device = get_dma_fops(dev_config);
 	assert(dma_device != (void*)0);
 
 	/* check if this channel is valid */
