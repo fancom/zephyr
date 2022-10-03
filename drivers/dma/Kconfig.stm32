@@ -2,6 +2,7 @@
 
 # Copyright (c) 2016 Intel Corporation
 # Copyright (c) 2019 Song Qiang <songqiang1304521@gmail.com>
+# Copyright (c) 2022 Jeroen van Dooren <jeroen.van.dooren@nobleo.nl>
 # SPDX-License-Identifier: Apache-2.0
 
 DT_COMPAT_ST_STM32_DMA_V1 := st,stm32-dma-v1
@@ -29,12 +30,6 @@ config DMA_STM32_V2
 	help
 	  Enable DMA V2 support.
 
-config DMAMUX_STM32
-	bool
-	default $(dt_compat_enabled,$(DT_COMPAT_ST_STM32_DMAMUX))
-	help
-	  Enable DMAMUX support.
-
 config DMA_STM32_SHARED_IRQS
 	bool
 	default y
@@ -43,3 +38,20 @@ config DMA_STM32_SHARED_IRQS
 	  Enable shared IRQ support on devices where channels share 1 IRQ.
 
 endif # DMA_STM32
+
+config BDMA_STM32
+	bool "Enable STM32 BDMA driver"
+	select USE_STM32_LL_BDMA
+	depends on SOC_SERIES_STM32H7X
+	help
+	  DMA driver for STM32 series SoCs.
+
+if DMA_STM32 || BDMA_STM32
+
+config DMAMUX_STM32
+	bool
+	default $(dt_compat_enabled,$(DT_COMPAT_ST_STM32_DMAMUX))
+	help
+	  Enable DMAMUX support.
+
+endif # DMA_STM32 || BDMA_STM32
