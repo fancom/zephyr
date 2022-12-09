@@ -163,7 +163,7 @@ void log_output_flush(const struct log_output *output)
 }
 
 static int timestamp_print(const struct log_output *output,
-			   uint32_t flags, uint32_t timestamp)
+			   uint32_t flags, log_timestamp_t timestamp)
 {
 	int length;
 	bool format =
@@ -501,7 +501,7 @@ static void raw_string_print(struct log_msg *msg,
 }
 
 static uint32_t prefix_print(const struct log_output *output,
-			 uint32_t flags, bool func_on, uint32_t timestamp, uint8_t level,
+			 uint32_t flags, bool func_on, log_timestamp_t timestamp, uint8_t level,
 			 uint8_t domain_id, int16_t source_id)
 {
 	uint32_t length = 0U;
