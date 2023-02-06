@@ -1,0 +1,2 @@
+config BOARD_CMC10
+	bool "CMC10 Process Controller"

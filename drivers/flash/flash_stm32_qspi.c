@@ -18,6 +18,7 @@
 #include <dt-bindings/dma/stm32_dma.h>
 #include <drivers/dma.h>
 #include <drivers/dma/dma_stm32.h>
+#include <drivers/gpio.h>
 
 #include <stm32_ll_dma.h>
 
@@ -864,6 +865,61 @@ static int spi_nor_process_bfp(const struct device *dev,
 	return 0;
 }
 
+static int flash_stm32_remove_write_protection(const struct device * dev)
+{
+	/* The only way we could get it to work is by pulling the WP
+	 * pin high, and then writing to the BP bits.
+	 */
+	
+	int ret;
+	uint8_t status;
+
+	const struct gpio_dt_spec wd = {
+		/* Hardcoded location for CMC10 */
+		.port = device_get_binding("GPIOE"),
+		.pin = 2,
+		.dt_flags = GPIO_ACTIVE_HIGH
+	};
+	gpio_pin_configure_dt(&wd, GPIO_OUTPUT_ACTIVE);	/* PULL HIGH */	
+	
+	ret = qspi_read_status(dev, &status);
+	if (ret < 0) {
+		LOG_ERR("Could not read status to ensure flash is not write protected");
+		return ret;
+	}
+
+	ret = qspi_write_enable(dev);
+	if (ret < 0) {
+		LOG_ERR("Could not WREN to write status");
+		return ret;
+	}
+
+	k_busy_wait(5000);
+
+	status &= ~SPI_NOR_BP1;
+	status &= ~SPI_NOR_BP2;
+	status &= ~SPI_NOR_BP3;
+	LOG_INF("disabling write protection");
+	qspi_write_status(dev, status);
+
+	k_busy_wait(5000);
+
+	ret = qspi_read_status(dev, &status);
+	if (ret < 0) {
+		LOG_ERR("Could not read status to verify flash is no longer write protected");
+		return ret;
+	}
+	
+	if (status & (SPI_NOR_BP1 | SPI_NOR_BP2 | SPI_NOR_BP3) ){
+		LOG_ERR("Remove write protection failed!");
+		return -EIO;
+	} else {
+		LOG_INF("Remove write protection success!");
+	}
+
+	return 0;
+}
+
 static int flash_stm32_ensure_not_write_protect(const struct device * dev)
 {
 	int ret;
@@ -1112,8 +1168,9 @@ static int flash_stm32_qspi_init(const struct device *dev)
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */
 	
 	if(flash_stm32_ensure_not_write_protect(dev) < 0) {
-		/* Don't allow flash to be initialized if BP bits are set */		
-		return -EIO;
+		flash_stm32_remove_write_protection(dev);
+	} else { 
+		LOG_INF("Write protection bits are not set");
 	}
 
 	ret = qspi_quad_output_set(dev, STM32_QSPI_USE_FOUR_DATALINES);

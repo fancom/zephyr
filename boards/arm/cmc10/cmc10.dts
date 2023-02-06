@@ -1,0 +1,81 @@
+/dts-v1/;
+
+#include <st/h7/stm32h743Xi.dtsi>
+#include <st/h7/stm32h743zitx-pinctrl.dtsi>
+
+/ {
+        model = "CMC10";
+        compatible = "optima,cmc10";
+
+        chosen {
+                zephyr,dtcm = &dtcm;
+                zephyr,sram = &sram0;
+        
+                zephyr,flash = &flash0;
+                // zephyr,code-partition = &slot0_partition;
+
+                zephyr,console = &usart1;
+                zephyr,shell-uart = &usart1;
+        };
+
+        soc {
+                quadspi: quadspi@52005000 {
+                        compatible = "st,stm32-qspi";
+                        label = "QUADSPI";
+                        #address-cells = <0x1>;
+                        #size-cells = <0x0>;
+                        reg = <0x52005000 0x1000>;
+                        interrupts = <92 0>;
+                        clocks = <&rcc STM32_CLOCK_BUS_AHB3 (1<<14)>;
+                        status = "disabled";
+                };
+        };
+};
+
+&usart1{
+        pinctrl-0 = <
+                &usart1_tx_pa9
+                &usart1_rx_pa10
+        >;
+        current-speed = <115200>;
+        status = "okay";
+    };
+
+
+&clk_hse {
+        clock-frequency = <DT_FREQ_M(25)>;
+        status = "okay";
+};
+
+&pll {
+        /* 25MHz to 475MHz, which is the
+         * closest to maximum of 480MHz
+         * with 25MHz input
+         */
+        div-m = <2>;
+        mul-n = <76>;
+        div-p = <2>;
+
+        /* The Q divider is specifically chosen
+         * to output the same speed as the peripheral
+         * clocks (118.75MHz). This is due to the following
+         * bug in the Zephyr code:
+         * https: //github.com/zephyrproject-rtos/zephyr/issues/41650
+         */
+        div-q = <8>;
+
+        div-r = <2>;
+        clocks = <&clk_hse>;
+        status = "okay";
+};
+
+&rcc {
+        clocks = <&pll>;
+        clock-frequency = <DT_FREQ_M(475)>;
+        d1cpre = <1>;
+        hpre = <2>;     /* HCLK: 237.5 MHz */
+        d2ppre1 = <2>;  /* APB1: 118.75 MHz */
+        d2ppre2 = <2>;  /* APB2: 118.75 MHz */
+        d1ppre = <2>;   /* APB3: 118.75 MHz */
+        d3ppre = <2>;   /* APB4: 118.75 MHz */
+};
