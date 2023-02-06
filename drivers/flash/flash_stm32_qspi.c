@@ -283,7 +283,7 @@ static int qspi_write_enable(const struct device *dev)
 	return qspi_send_cmd(dev, &cmd_write_en);
 }
 
-static int qspi_read_status(const struct device *dev, uint8_t *status)
+static int qspi_read_status(const struct device *dev, uint8_t number, uint8_t *status)
 {
 #ifndef CONFIG_FLASH_STM32_OSPI_MIMIC_QSPI
 	QSPI_CommandTypeDef cmd = {
@@ -299,10 +299,17 @@ static int qspi_read_status(const struct device *dev, uint8_t *status)
 	};
 #endif
 
+	switch(number) {
+		case 1: cmd.Instruction = SPI_NOR_CMD_RDSR;	break;
+		case 2: cmd.Instruction = SPI_NOR_CMD_RDSR2;	break;
+		case 3: cmd.Instruction = SPI_NOR_CMD_RDSR3;	break;
+		default: return -EINVAL;
+	}
+
 	return qspi_read_access(dev, &cmd, status, 1);
 }
 
-static int qspi_write_status(const struct device *dev, uint8_t status)
+static int qspi_write_status(const struct device *dev, uint8_t number, uint8_t status)
 {
 	int ret;
 
@@ -319,6 +326,13 @@ static int qspi_write_status(const struct device *dev, uint8_t status)
 		.DataMode = HAL_OSPI_DATA_1_LINE,
 	};
 #endif
+
+	switch(number) {
+		case 1: cmd.Instruction = SPI_NOR_CMD_WRSR;	break;
+		case 2: cmd.Instruction = SPI_NOR_CMD_WRSR2;	break;
+		case 3: cmd.Instruction = SPI_NOR_CMD_WRSR3;	break;
+		default: return -EINVAL;
+	}
 
 	ret = qspi_write_enable(dev);
 	if (ret < 0) {
@@ -370,7 +384,7 @@ static int qspi_quad_output_set(const struct device *dev, bool enable)
 	int ret;
 	uint8_t status;
 
-	ret = qspi_read_status(dev, &status);
+	ret = qspi_read_status(dev, 2, &status);
 	if (ret < 0) {
 		LOG_ERR("Could not read status to set QE bit");
 		return ret;
@@ -382,7 +396,7 @@ static int qspi_quad_output_set(const struct device *dev, bool enable)
 		status &= ~SPI_NOR_QE_BIT;
 	}
 
-	return qspi_write_status(dev, status);
+	return qspi_write_status(dev, 2, status);
 }
 
 static bool qspi_address_is_valid(const struct device *dev, off_t addr,
@@ -460,7 +474,7 @@ static int qspi_wait_until_ready(const struct device *dev)
 	uint8_t status;
 
 	do {
-		ret = qspi_read_status(dev, &status);
+		ret = qspi_read_status(dev, 1, &status);
 	} while (!ret && (status & SPI_NOR_WIP_BIT));
 
 	return ret;
@@ -869,11 +883,13 @@ static int flash_stm32_ensure_not_write_protect(const struct device * dev)
 	int ret;
 	uint8_t status;
 
-	ret = qspi_read_status(dev, &status);
+	ret = qspi_read_status(dev, 1, &status);
 	if (ret < 0) {
 		LOG_ERR("Could not read status to ensure flash is not write protected");
 		return ret;
 	}
+
+	LOG_ERR("Status: 0x%X", status);
 
 	if (status & (SPI_NOR_BP1 | SPI_NOR_BP2 | SPI_NOR_BP3)) {
 		/* If block protection bits are set and an attempt
