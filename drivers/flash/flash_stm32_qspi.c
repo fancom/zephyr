@@ -864,6 +864,29 @@ static int spi_nor_process_bfp(const struct device *dev,
 	return 0;
 }
 
+static int flash_stm32_ensure_not_write_protect(const struct device * dev)
+{
+	int ret;
+	uint8_t status;
+
+	ret = qspi_read_status(dev, &status);
+	if (ret < 0) {
+		LOG_ERR("Could not read status to ensure flash is not write protected");
+		return ret;
+	}
+
+	if (status & (SPI_NOR_BP1 | SPI_NOR_BP2 | SPI_NOR_BP3)) {
+		/* If block protection bits are set and an attempt
+		 * is made to write to that area then the write
+		 * will silently fail
+		 */
+		LOG_ERR("Block protection are set!");
+		return -EIO;
+	}
+
+	return ret;
+}
+
 static int flash_stm32_qspi_init(const struct device *dev)
 {
 	const struct flash_stm32_qspi_config *dev_cfg = DEV_CFG(dev);
@@ -1020,6 +1043,9 @@ static int flash_stm32_qspi_init(const struct device *dev)
 	/* Run IRQ init */
 	dev_cfg->irq_config(dev);
 
+	/* Wait for device to start up */
+	k_busy_wait(5000);
+
 	/* Run NOR init */
 	const uint8_t decl_nph = 2;
 	union {
@@ -1084,6 +1110,11 @@ static int flash_stm32_qspi_init(const struct device *dev)
 		return -ENODEV;
 	}
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */
+	
+	if(flash_stm32_ensure_not_write_protect(dev) < 0) {
+		/* Don't allow flash to be initialized if BP bits are set */		
+		return -EIO;
+	}
 
 	ret = qspi_quad_output_set(dev, STM32_QSPI_USE_FOUR_DATALINES);
 	if (ret < 0) {
