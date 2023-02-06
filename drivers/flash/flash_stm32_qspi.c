@@ -390,13 +390,35 @@ static int qspi_quad_output_set(const struct device *dev, bool enable)
 		return ret;
 	}
 
-	if (enable) {
-		status |= SPI_NOR_QE_BIT;
-	} else {
-		status &= ~SPI_NOR_QE_BIT;
+	bool qe_bit_set = (status & SPI_NOR_QE_BIT) > 0;
+	if (qe_bit_set != enable){
+		if (enable) {
+			status |= SPI_NOR_QE_BIT;
+		} else {
+			status &= ~SPI_NOR_QE_BIT;
+		}
+
+		ret = qspi_write_status(dev, 2, status);
+		if (ret < 0) {
+			LOG_ERR("Could not write status to set QE bit");
+			return ret;
+		}
+
+		ret = qspi_read_status(dev, 2, &status);
+		if (ret < 0) {
+			LOG_ERR("Could not read status to verify QE bit is set to correct state");
+			return ret;
+		}
+
+		qe_bit_set = (status & SPI_NOR_QE_BIT) > 0;
+		if (qe_bit_set != enable){
+			LOG_DBG("QE bit not altered after write");
+			return -EIO;
+		}
 	}
 
-	return qspi_write_status(dev, 2, status);
+	LOG_ERR("Set quad output: %s", enable ? "true" : "false");
+	return 0;	
 }
 
 static bool qspi_address_is_valid(const struct device *dev, off_t addr,
@@ -889,8 +911,6 @@ static int flash_stm32_ensure_not_write_protect(const struct device * dev)
 		return ret;
 	}
 
-	LOG_ERR("Status: 0x%X", status);
-
 	if (status & (SPI_NOR_BP1 | SPI_NOR_BP2 | SPI_NOR_BP3)) {
 		/* If block protection bits are set and an attempt
 		 * is made to write to that area then the write
@@ -1134,10 +1154,8 @@ static int flash_stm32_qspi_init(const struct device *dev)
 
 	ret = qspi_quad_output_set(dev, STM32_QSPI_USE_FOUR_DATALINES);
 	if (ret < 0) {
-		LOG_ERR("Enabling quad output");
 		return -EIO;
 	}
-	LOG_DBG("Set quad output: %s", STM32_QSPI_USE_FOUR_DATALINES ? "true" : "false");
 
 	/* wait until quad output is set before doing an immediate read/write call */
 	qspi_wait_until_ready(dev);
