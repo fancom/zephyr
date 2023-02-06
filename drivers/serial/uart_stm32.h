@@ -27,7 +27,7 @@ struct uart_stm32_config {
 	/* initial hardware flow control, 1 for RTS/CTS */
 	bool hw_flow_control;
 	/* initial parity, 0 for none, 1 for odd, 2 for even */
-	int  parity;
+	int parity;
 	/* switch to enable single wire / half duplex feature */
 	bool single_wire;
 	/* enable tx/rx pin swap */
@@ -36,6 +36,10 @@ struct uart_stm32_config {
 	bool rx_invert;
 	/* enable tx pin inversion */
 	bool tx_invert;
+	/* number of stop bits, 0 for 1, 1 for .5, 2 for 1.5, 3 for 2 */
+	int stop_bits;
+	/* number of data bits, 0 for 8, 1 for 7, 2 for 9 */
+	int data_bits;
 	const struct pinctrl_dev_config *pcfg;
 #if defined(CONFIG_UART_INTERRUPT_DRIVEN) || defined(CONFIG_UART_ASYNC_API) || \
 	defined(CONFIG_PM)
@@ -97,4 +101,4 @@ struct uart_stm32_data {
 #endif
 };
 
-#endif	/* ZEPHYR_DRIVERS_SERIAL_UART_STM32_H_ */
+#endif /* ZEPHYR_DRIVERS_SERIAL_UART_STM32_H_ */

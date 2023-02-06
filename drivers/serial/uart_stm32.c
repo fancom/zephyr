@@ -1592,6 +1592,7 @@ static int uart_stm32_init(const struct device *dev)
 	struct uart_stm32_data *data = dev->data;
 	uint32_t ll_parity;
 	uint32_t ll_datawidth;
+	uint32_t ll_stopbits;
 	int err;
 
 	__uart_stm32_get_clock(dev);
@@ -1642,28 +1643,75 @@ static int uart_stm32_init(const struct device *dev)
 	 * 'none' we must use datawidth = 9 (to get 8 databit + 1 parity bit).
 	 */
 	if (config->parity == 2) {
-		/* 8 databit, 1 parity bit, parity even */
 		ll_parity = LL_USART_PARITY_EVEN;
-		ll_datawidth = LL_USART_DATAWIDTH_9B;
 	} else if (config->parity == 1) {
-		/* 8 databit, 1 parity bit, parity odd */
 		ll_parity = LL_USART_PARITY_ODD;
-		ll_datawidth = LL_USART_DATAWIDTH_9B;
-	} else {  /* Default to 8N0, but show warning if invalid value */
+	} else { /* Default to 8N0, but show warning if invalid value */
 		if (config->parity != 0) {
 			LOG_WRN("Invalid parity setting '%d'."
-				"Defaulting to 'none'.", config->parity);
+				"Defaulting to 'none'.",
+				config->parity);
 		}
-		/* 8 databit, parity none */
 		ll_parity = LL_USART_PARITY_NONE;
+	}
+
+	if (config->data_bits == 4) {
+		ll_datawidth = LL_USART_DATAWIDTH_9B;
+#ifdef LL_USART_DATAWIDTH_7B
+	} else if (config->data_bits == 2) {
+		ll_datawidth = LL_USART_DATAWIDTH_7B;
+#endif
+	} else {
+		if (config->data_bits != 3) {
+			LOG_WRN("Invalid data bits setting '%d'."
+				"Defaulting to width '8'.",
+				config->data_bits);
+		}
 		ll_datawidth = LL_USART_DATAWIDTH_8B;
 	}
 
-	/* Set datawidth and parity, 1 start bit, 1 stop bit  */
-	LL_USART_ConfigCharacter(config->usart,
-				 ll_datawidth,
-				 ll_parity,
-				 LL_USART_STOPBITS_1);
+	if (config->stop_bits == 3) {
+		ll_stopbits = LL_USART_STOPBITS_2;
+	} else if (config->stop_bits == 2) {
+#ifdef LL_USART_STOPBITS_1_5
+		ll_stopbits = LL_USART_STOPBITS_1_5;
+#if HAS_LPUART_1
+		if (IS_LPUART_INSTANCE(config->usart)) {
+			LOG_WRN("Invalid stop bits setting '%d'."
+				"Defaulting to '1'.",
+				config->stop_bits);
+			ll_stopbits = LL_USART_STOPBITS_1;
+		}
+#endif /* HAS_LPUART_1 */
+#else
+		LOG_WRN("Invalid stop bits setting '%d'."
+			"Defaulting to '1'.",
+			config->stop_bits);
+		ll_stopbits = LL_USART_STOPBITS_1;
+#endif
+	} else if (config->stop_bits == 0) {
+#ifdef LL_USART_STOPBITS_0_5
+		ll_stopbits = LL_USART_STOPBITS_0_5;
+#if HAS_LPUART_1
+		if (IS_LPUART_INSTANCE(config->usart)) {
+			LOG_WRN("Invalid stop bits setting '%d'."
+				"Defaulting to '1'.",
+				config->stop_bits);
+			ll_stopbits = LL_USART_STOPBITS_1;
+		}
+#endif /* HAS_LPUART_1 */
+#else
+		LOG_WRN("Invalid stop bits setting '%d'."
+			"Defaulting to '1'.",
+			config->stop_bits);
+		ll_stopbits = LL_USART_STOPBITS_1;
+#endif
+	} else {
+		ll_stopbits = LL_USART_STOPBITS_1;
+	}
+
+	/* Set datawidth and parity, start bit, stop bit  */
+	LL_USART_ConfigCharacter(config->usart, ll_datawidth, ll_parity, ll_stopbits);
 
 	if (config->hw_flow_control) {
 		uart_stm32_set_hwctrl(dev, LL_USART_HWCONTROL_RTS_CTS);
@@ -1904,6 +1952,8 @@ static const struct uart_stm32_config uart_stm32_cfg_##index = {	\
 	.tx_rx_swap = DT_INST_PROP_OR(index, tx_rx_swap, false),	\
 	.rx_invert = DT_INST_PROP(index, rx_invert),			\
 	.tx_invert = DT_INST_PROP(index, tx_invert),			\
+	.stop_bits = DT_INST_ENUM_IDX_OR(index, tx_stop_bits, UART_CFG_STOP_BITS_1),       \
+	.data_bits = DT_INST_ENUM_IDX_OR(index, data_bits, UART_CFG_DATA_BITS_8),          \
 	STM32_UART_IRQ_HANDLER_FUNC(index)				\
 	STM32_UART_PM_WAKEUP(index)					\
 };									\
