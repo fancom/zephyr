@@ -417,7 +417,7 @@ static int qspi_quad_output_set(const struct device *dev, bool enable)
 		}
 	}
 
-	LOG_ERR("Set quad output: %s", enable ? "true" : "false");
+	LOG_DBG("Set quad output: %s", enable ? "true" : "false");
 	return 0;	
 }
 
