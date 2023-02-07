@@ -13,17 +13,25 @@
 #define SPI_NOR_DUMMY_BYTE  8           /* In number of bits */
 
 /* Status register bits */
-#define SPI_NOR_WIP_BIT         BIT(0)  /* Write in progress */
-#define SPI_NOR_WEL_BIT         BIT(1)  /* Write enable latch */
-#define SPI_NOR_QE_BIT          BIT(6)  /* Quad Enable bit */
+#define SPI_NOR_WIP_BIT         BIT(0)  /* SR1: Write in progress */
+#define SPI_NOR_WEL_BIT         BIT(1)  /* SR1: Write enable latch */
+#define SPI_NOR_BP1             BIT(2)  /* SR1: Block Protect 1 */
+#define SPI_NOR_BP2             BIT(3)  /* SR1: Block Protect 2 */
+#define SPI_NOR_BP3             BIT(4)  /* SR1: Block Protect 3 */
+#define SPI_NOR_QE_BIT          BIT(1)  /* SR2: Quad Enable bit */
 
 /* Flash opcodes */
 #define SPI_NOR_CMD_WRSR        0x01    /* Write status register */
 #define SPI_NOR_CMD_RDSR        0x05    /* Read status register */
+#define SPI_NOR_CMD_WRSR2       0x31    /* Write status register 2 */
+#define SPI_NOR_CMD_RDSR2       0x35    /* Read status register 2 */
+#define SPI_NOR_CMD_RDSR3       0x15    /* Read status register 3 */
+#define SPI_NOR_CMD_WRSR3       0x11    /* Write status register 3 */
 #define SPI_NOR_CMD_READ        0x03    /* Normal read */
 #define SPI_NOR_CMD_FRDO        0x3B    /* Fast read dual output */
 #define SPI_NOR_CMD_FRQO        0x6B    /* Fast read quad output */
 #define SPI_NOR_CMD_WREN        0x06    /* Write enable */
+#define SPI_NOR_CMD_VSRWEN      0x50    /* Volatile SR Write Enable */
 #define SPI_NOR_CMD_WRDI        0x04    /* Write disable */
 #define SPI_NOR_CMD_PP          0x02    /* Page program */
 #define SPI_NOR_CMD_PPQ         0x32    /* Quad Input Page Program Operation */
