@@ -1,0 +1,111 @@
+/dts-v1/;
+
+#include <st/h7/stm32h743Xi.dtsi>
+#include <st/h7/stm32h743zitx-pinctrl.dtsi>
+
+/ {
+        model = "CMC10";
+        compatible = "optima,cmc10";
+
+        chosen {
+                zephyr,dtcm = &dtcm;
+                zephyr,sram = &sram0;
+
+                zephyr,flash = &flash0;
+                // zephyr,code-partition = &slot0_partition;
+
+                zephyr,console = &usart1;
+                zephyr,shell-uart = &usart1;
+        };
+
+        soc {
+                quadspi: quadspi@52005000 {
+                        compatible = "st,stm32-qspi";
+                        #address-cells = <0x1>;
+                        #size-cells = <0x0>;
+                        reg = <0x52005000 0x1000>;
+                        interrupts = <92 0>;
+                        clocks = <&rcc STM32_CLOCK_BUS_AHB3 (1<<14)>;
+                        status = "disabled";
+                };
+        };
+
+	gpio_in {
+		compatible = "gpio-keys";
+		eth_int: eth_int {
+		gpios = <&gpioe 7 GPIO_ACTIVE_HIGH>;
+		};
+    	};
+
+	gpio_out {
+		compatible = "gpio-leds";
+		ethsw_reset: ethsw_reset {
+		gpios = <&gpiog 1 GPIO_ACTIVE_LOW>;
+		};
+	};
+};
+
+&usart1{
+    pinctrl-0 = <
+        &usart1_tx_pa9
+        &usart1_rx_pa10
+    >;
+    current-speed = <115200>;
+    pinctrl-names = "default";
+    status = "okay";
+};
+
+
+&clk_hse {
+        clock-frequency = <DT_FREQ_M(25)>;
+        status = "okay";
+};
+
+&pll {
+        /* 25MHz to 475MHz, which is the
+         * closest to maximum of 480MHz
+         * with 25MHz input
+         */
+        div-m = <2>;
+        mul-n = <76>;
+        div-p = <2>;
+
+        /* The Q divider is specifically chosen
+         * to output the same speed as the peripheral
+         * clocks (118.75MHz). This is due to the following
+         * bug in the Zephyr code:
+         * https: //github.com/zephyrproject-rtos/zephyr/issues/41650
+         */
+        div-q = <8>;
+
+        div-r = <2>;
+        clocks = <&clk_hse>;
+        status = "okay";
+};
+
+&rcc {
+        clocks = <&pll>;
+        clock-frequency = <DT_FREQ_M(475)>;
+        d1cpre = <1>;
+        hpre = <2>;     /* HCLK: 237.5 MHz */
+        d2ppre1 = <2>;  /* APB1: 118.75 MHz */
+        d2ppre2 = <2>;  /* APB2: 118.75 MHz */
+        d1ppre = <2>;   /* APB3: 118.75 MHz */
+        d3ppre = <2>;   /* APB4: 118.75 MHz */
+};
+
+&mac {
+    status = "okay";
+    pinctrl-0 = <
+        &eth_mdc_pc1
+        &eth_rxd0_pc4
+        &eth_rxd1_pc5
+        &eth_ref_clk_pa1
+        &eth_mdio_pa2
+        &eth_crs_dv_pa7
+        &eth_tx_en_pb11
+        &eth_txd0_pb12
+        &eth_txd1_pb13
+    >;
+    pinctrl-names = "default";
+};
