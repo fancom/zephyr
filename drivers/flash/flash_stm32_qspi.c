@@ -916,7 +916,7 @@ static int flash_stm32_ensure_not_write_protect(const struct device * dev)
 		 * is made to write to that area then the write
 		 * will silently fail
 		 */
-		LOG_ERR("Block protection are set!");
+		LOG_ERR("There are Block protection set! (Status: 0x%X)", status);
 		return -EIO;
 	}
 
@@ -1148,8 +1148,7 @@ static int flash_stm32_qspi_init(const struct device *dev)
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */
 	
 	if(flash_stm32_ensure_not_write_protect(dev) < 0) {
-		/* Don't allow flash to be initialized if BP bits are set */		
-		return -EIO;
+		/* Nothing good to do if write protection is set */
 	}
 
 	ret = qspi_quad_output_set(dev, STM32_QSPI_USE_FOUR_DATALINES);
