@@ -96,7 +96,6 @@ static inline void mgmt_push_event(uint32_t mgmt_event, struct net_if *iface,
 
 	if (cbInvocationOngoing) {
 		NET_WARN("Re-entrant call from within a callback isn't best practice");
-		//printf("[mgmt_push_event] re-entrancy detected!!!\n");
 	}
 
 	//printf("[mgmt_push_event] Placing event at index: %d, event %d, iface %p\n", head, (int)mgmt_event, iface);
@@ -127,24 +126,17 @@ static inline void mgmt_push_event(uint32_t mgmt_event, struct net_if *iface,
 	(void)k_mutex_unlock(&net_mgmt_lock);
 }
 
-static inline struct mgmt_event_entry *mgmt_peek_event(void)
+static inline bool mgmt_pop_event(struct mgmt_event_entry *dst)
 {
 	if (!is_event_queue_full() && (head == tail)) {
-		return NULL;
+		memset(dst, 0, sizeof(struct mgmt_event_entry));
+		return false;
 	}
 
-	return &events[tail];
-}
-
-static inline void mgmt_pop_event(void)
-{
+	memcpy(dst, &events[tail], sizeof(struct mgmt_event_entry));
+	memset(&events[tail], 0, sizeof(struct mgmt_event_entry));
 	retreat_event_queue_pointer();
-}
-
-static inline void mgmt_clean_event(struct mgmt_event_entry *mgmt_event)
-{
-	mgmt_event->event = 0U;
-	mgmt_event->iface = NULL;
+	return true;
 }
 
 static inline void mgmt_add_event_mask(uint32_t event_mask)
@@ -176,7 +168,7 @@ static inline bool mgmt_is_event_handled(uint32_t mgmt_event)
 		 NET_MGMT_GET_COMMAND(mgmt_event)));
 }
 
-static inline void mgmt_run_callbacks(struct mgmt_event_entry *mgmt_event)
+static inline void mgmt_run_callbacks(const struct mgmt_event_entry *mgmt_event)
 {
 	sys_snode_t *prev = NULL;
 	struct net_mgmt_event_callback *cb, *tmp;
@@ -234,10 +226,9 @@ static inline void mgmt_run_callbacks(struct mgmt_event_entry *mgmt_event)
 		} else {
 			NET_DBG("Running callback %p : %p",
 				cb, cb->handler);
-			/*printf("Running callback %p : %p\n",
-				cb, cb->handler);*/
 
 			cbInvocationOngoing = true;
+			/* The handler iface argument should have been a const* */
 			cb->handler(cb, mgmt_event->event, mgmt_event->iface);
 			cbInvocationOngoing = false;
 			prev = &cb->node;
@@ -251,7 +242,7 @@ static inline void mgmt_run_callbacks(struct mgmt_event_entry *mgmt_event)
 
 static void mgmt_thread(void)
 {
-	struct mgmt_event_entry *mgmt_event;
+	struct mgmt_event_entry mgmt_event;
 
 	while (1) {
 		k_sem_take(&network_event, K_FOREVER);
@@ -261,15 +252,20 @@ static void mgmt_thread(void)
 
 		NET_DBG("Handling events, forwarding it relevantly");
 
-		mgmt_event = mgmt_peek_event();
-		if (!mgmt_event) {
+		/* in the callback, a call could be done again to mgmt_push_event
+		 * causing another element to be pushed onto the queue.
+		 * Hence, the pop removes it already from the queue and a copy is
+		 * used for processing in the callbacks.
+		 * An example of such a recursion in the mDNS mdns_iface_event_handler
+		 * calling net_ipv4_igmp_join, injecting an event
+		 */
+		if (!mgmt_pop_event(&mgmt_event)) {
 			/* System is over-loaded?
 			 * At this point we have most probably notified
 			 * more events than we could handle
 			 */
 			NET_WARN("Some event got probably lost (%u), try increasing the 'CONFIG_NET_MGMT_EVENT_QUEUE_SIZE'",
 				k_sem_count_get(&network_event));
-			//printf("ZZZZ\n");
 
 			k_sem_init(&network_event, 0, K_SEM_MAX_LIMIT);
 			(void)k_mutex_unlock(&net_mgmt_lock);
@@ -277,18 +273,7 @@ static void mgmt_thread(void)
 			continue;
 		}
 
-		/* in the callback, a call could be done again to mgmt_push_event
-		 * causing another element to be pushed onto the queue.
-		 * Hence, we a peek is needed to keep the head and tail counter as is
-		 * until callbacks have passed.
-		 * An example of such a recursion in the mDNS mdns_iface_event_handler
-		 * calling net_ipv4_igmp_join, injecting an event
-		 */
-		mgmt_run_callbacks(mgmt_event);
-
-		mgmt_clean_event(mgmt_event);
-
-		mgmt_pop_event();
+		mgmt_run_callbacks(&mgmt_event);
 
 		(void)k_mutex_unlock(&net_mgmt_lock);
 
@@ -509,7 +494,7 @@ static inline void mgmt_push_event(uint32_t mgmt_event, struct net_if *iface,
 	(void)k_mutex_lock(&net_mgmt_lock, K_FOREVER);
 
 	if (cbInvocationOngoing) {
-		NET_ERR("Re-entrant call from within a callback isn't best practice");
+		NET_WARN("Re-entrant call from within a callback isn't best practice");
 	}
 
 	i_idx = in_event + 1;
