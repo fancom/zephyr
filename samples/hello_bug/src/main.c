@@ -69,10 +69,10 @@ void main(void)
 
 	LOG_INF("Run hello-bug");
 
-	gpio_pin_configure(
+	/*gpio_pin_configure(
 		DEVICE_DT_GET_OR_NULL(DT_GPIO_CTLR(DT_NODELABEL(ethsw_reset), gpios)),
 		DT_GPIO_PIN(DT_NODELABEL(ethsw_reset), gpios),
-            	GPIO_OUTPUT_INACTIVE | DT_GPIO_FLAGS(DT_NODELABEL(ethsw_reset), gpios));
+            	GPIO_OUTPUT_INACTIVE | DT_GPIO_FLAGS(DT_NODELABEL(ethsw_reset), gpios));*/
 
 	net_mgmt_init_event_callback(&mgmt_cb, handler,
 				     NET_EVENT_IPV4_ADDR_ADD | NET_EVENT_IPV4_MCAST_JOIN);
