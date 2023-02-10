@@ -1,4 +1,4 @@
-#if 0
+#if 1
 /*
  * Copyright (c) 2016 Intel Corporation.
  *
@@ -45,7 +45,7 @@ static sys_slist_t event_callbacks = SYS_SLIST_STATIC_INIT(&event_callbacks);
 static uint16_t head;
 static uint16_t tail;
 
-static bool cbInvocationOngoing = false;
+static bool callback_invocation_ongoing = false;
 
 
 static inline bool is_event_queue_full(void) {
@@ -94,11 +94,9 @@ static inline void mgmt_push_event(uint32_t mgmt_event, struct net_if *iface,
 
 	(void)k_mutex_lock(&net_mgmt_lock, K_FOREVER);
 
-	if (cbInvocationOngoing) {
+	if (callback_invocation_ongoing) {
 		NET_WARN("Re-entrant call from within a callback isn't best practice");
 	}
-
-	//printf("[mgmt_push_event] Placing event at index: %d, event %d, iface %p\n", head, (int)mgmt_event, iface);
 
 	events[head].event = mgmt_event;
 	events[head].iface = iface;
@@ -177,10 +175,6 @@ static inline void mgmt_run_callbacks(const struct mgmt_event_entry *mgmt_event)
 		NET_MGMT_GET_LAYER(mgmt_event->event),
 		NET_MGMT_GET_LAYER_CODE(mgmt_event->event),
 		NET_MGMT_GET_COMMAND(mgmt_event->event));
-	/*printf("Event layer %u code %u cmd %u\n",
-		NET_MGMT_GET_LAYER(mgmt_event->event),
-		NET_MGMT_GET_LAYER_CODE(mgmt_event->event),
-		NET_MGMT_GET_COMMAND(mgmt_event->event));*/
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&event_callbacks, cb, tmp, node) {
 		if (!(NET_MGMT_GET_LAYER(mgmt_event->event) ==
@@ -191,7 +185,6 @@ static inline void mgmt_run_callbacks(const struct mgmt_event_entry *mgmt_event)
 		     NET_MGMT_GET_COMMAND(cb->event_mask) &&
 		     !(NET_MGMT_GET_COMMAND(mgmt_event->event) &
 		       NET_MGMT_GET_COMMAND(cb->event_mask)))) {
-			//printf("cb %p isn't interested\n", cb);
 			continue;
 		}
 
@@ -227,10 +220,10 @@ static inline void mgmt_run_callbacks(const struct mgmt_event_entry *mgmt_event)
 			NET_DBG("Running callback %p : %p",
 				cb, cb->handler);
 
-			cbInvocationOngoing = true;
+			callback_invocation_ongoing = true;
 			/* The handler iface argument should have been a const* */
 			cb->handler(cb, mgmt_event->event, mgmt_event->iface);
-			cbInvocationOngoing = false;
+			callback_invocation_ongoing = false;
 			prev = &cb->node;
 		}
 	}
@@ -247,7 +240,6 @@ static void mgmt_thread(void)
 	while (1) {
 		k_sem_take(&network_event, K_FOREVER);
 
-		//printf("[mgmt_thread] sem count: %d\n", k_sem_count_get(&network_event));
 		(void)k_mutex_lock(&net_mgmt_lock, K_FOREVER);
 
 		NET_DBG("Handling events, forwarding it relevantly");
@@ -368,10 +360,6 @@ void net_mgmt_event_notify_with_info(uint32_t mgmt_event, struct net_if *iface,
 			NET_MGMT_GET_LAYER(mgmt_event),
 			NET_MGMT_GET_LAYER_CODE(mgmt_event),
 			NET_MGMT_GET_COMMAND(mgmt_event));
-		/*printf("Notifying Event layer %u code %u type %u\n",
-			NET_MGMT_GET_LAYER(mgmt_event),
-			NET_MGMT_GET_LAYER_CODE(mgmt_event),
-			NET_MGMT_GET_COMMAND(mgmt_event));*/
 
 		mgmt_push_event(mgmt_event, iface, info, length);
 		k_sem_give(&network_event);
