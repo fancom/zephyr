@@ -235,10 +235,9 @@ static inline void adc_context_on_sampling_done(struct adc_context *ctx,
 		bool finish = false;
 		bool repeat = false;
 
-		if (callback) {
-			action = callback(dev,
-					  &ctx->sequence,
-					  ctx->sampling_index);
+		if (callback && (!ctx->options.batch_mode ||
+				 ctx->sampling_index < ctx->options.extra_samplings - 1)) {
+			action = callback(dev, &ctx->sequence, ctx->sampling_index);
 		} else {
 			action = ADC_ACTION_CONTINUE;
 		}
