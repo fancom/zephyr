@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2018 Nordic Semiconductor ASA
  * Copyright (c) 2016 Intel Corporation
+ * Copyright (c) 2023 Nobleo Technology
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -705,6 +706,56 @@ static int test_task_with_interval(void)
 ZTEST(adc_basic, test_adc_sample_with_interval)
 {
 	zassert_true(test_task_with_interval() == TC_PASS);
+}
+
+
+/*
+ * test_adc_sample_with_interval
+ */
+static uint8_t test_batch_mode_callback_counter = 0;
+
+static enum adc_action test_task_batch_mode_callback(const struct device *dev,
+						     const struct adc_sequence *sequence,
+						     uint16_t sampling_index)
+{
+	test_batch_mode_callback_counter++;
+	return ADC_ACTION_CONTINUE;
+}
+
+static int test_task_batch_mode(void)
+{
+	int ret;
+	const struct adc_sequence_options options = {
+		.interval_us     = 0,
+		.callback        = test_task_batch_mode_callback,
+		.extra_samplings = 4,
+	};
+	const struct adc_sequence sequence = {
+		.options     = &options,
+		.channels    = BIT(ADC_1ST_CHANNEL_ID),
+		.buffer      = m_sample_buffer,
+		.buffer_size = sizeof(m_sample_buffer),
+		.resolution  = ADC_RESOLUTION,
+	};
+
+	const struct device *adc_dev = init_adc();
+
+	if (!adc_dev) {
+		return TC_FAIL;
+	}
+
+	ret = adc_read(adc_dev, &sequence);
+	zassert_equal(ret, 0, "adc_read() failed with code %d", ret);
+
+	check_samples(1 + options.extra_samplings);
+	zassert_equal(test_batch_mode_callback_counter, 1, "Callback should only be called once");
+
+	return TC_PASS;
+}
+
+ZTEST(adc_basic, test_adc_batch_mode)
+{
+	zassert_true(test_task_batch_mode() == TC_PASS);
 }
 
 /*
