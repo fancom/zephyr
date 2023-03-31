@@ -344,7 +344,7 @@ size_t get_bitarray_popcnt(sys_bitarray_t *ba)
 	unsigned int idx;
 
 	for (idx = 0; idx < ba->num_bundles; idx++) {
-		popcnt += popcount(ba->bundles[idx]);
+		popcnt += POPCOUNT(ba->bundles[idx]);
 	}
 
 	return popcnt;
