@@ -815,7 +815,7 @@ void test_object_recycle(void)
 		     "object wasn't marked as initialized");
 
 	for (int i = 0; i < CONFIG_MAX_THREAD_BYTES; i++) {
-		perms_count += popcount(ko->perms[i]);
+		perms_count += POPCOUNT(ko->perms[i]);
 	}
 
 	zassert_true(perms_count == 1, "invalid number of thread permissions");

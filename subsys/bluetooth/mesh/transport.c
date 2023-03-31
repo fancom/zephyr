@@ -1001,7 +1001,7 @@ static inline int32_t ack_timeout(struct seg_rx *rx)
 	to = 150 + (ttl * 50U);
 
 	/* 100 ms for every not yet received segment */
-	to += ((rx->seg_n + 1) - popcount(rx->block)) * 100U;
+	to += ((rx->seg_n + 1) - POPCOUNT(rx->block)) * 100U;
 
 	/* Make sure we don't send more frequently than the duration for
 	 * each packet (default is 300ms).
