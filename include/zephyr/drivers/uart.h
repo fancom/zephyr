@@ -693,7 +693,7 @@ static inline int z_impl_uart_config_get(const struct device *dev,
  *
  * @param dev UART device instance.
  * @param tx_data Data to transmit.
- * @param size Number of bytes to send.
+ * @param size Positive number of data items to transmit.
  *
  * @return Number of bytes sent.
  * @retval -ENOSYS  if this function is not supported
@@ -734,7 +734,7 @@ static inline int uart_fifo_fill(const struct device *dev,
  *
  * @param dev UART device instance.
  * @param tx_data Wide data to transmit.
- * @param size Number of datum to send.
+ * @param size Positive number of wide data items to transmit.
  *
  * @return Number of datum sent.
  * @retval -ENOSYS If this function is not implemented
@@ -779,7 +779,7 @@ static inline int uart_fifo_fill_u16(const struct device *dev,
  *
  * @param dev UART device instance.
  * @param rx_data Data container.
- * @param size Container size.
+ * @param size Positive number of available data slots in the container.
  *
  * @return Number of bytes read.
  * @retval -ENOSYS If this function is not implemented.
@@ -823,7 +823,7 @@ static inline int uart_fifo_read(const struct device *dev, uint8_t *rx_data,
  *
  * @param dev UART device instance.
  * @param rx_data Wide data container.
- * @param size Container size.
+ * @param size Positive number of available wide data slots in the container.
  *
  * @return Number of datum read.
  * @retval -ENOSYS If this function is not implemented.
@@ -1261,7 +1261,7 @@ static inline int uart_callback_set(const struct device *dev,
  *
  * @param dev     UART device instance.
  * @param buf     Pointer to transmit buffer.
- * @param len     Length of transmit buffer.
+ * @param len     Positive number of data items to transmit.
  * @param timeout Timeout in microseconds. Valid only if flow control is
  *		  enabled. @ref SYS_FOREVER_US disables timeout.
  *
@@ -1300,7 +1300,7 @@ static inline int z_impl_uart_tx(const struct device *dev, const uint8_t *buf,
  *
  * @param dev     UART device instance.
  * @param buf     Pointer to wide data transmit buffer.
- * @param len     Length of wide data transmit buffer.
+ * @param len     Positive number of wide data items to transmit.
  * @param timeout Timeout in milliseconds. Valid only if flow control is
  *		  enabled. @ref SYS_FOREVER_MS disables timeout.
  *
@@ -1367,7 +1367,7 @@ static inline int z_impl_uart_tx_abort(const struct device *dev)
  *
  * @param dev     UART device instance.
  * @param buf     Pointer to receive buffer.
- * @param len     Buffer length.
+ * @param len     Positive number of available data slots in the buffer.
  * @param timeout Inactivity period after receiving at least a byte which
  *		  triggers  #UART_RX_RDY event. Given in microseconds.
  *		  @ref SYS_FOREVER_US disables timeout. See @ref uart_event_type
@@ -1410,7 +1410,7 @@ static inline int z_impl_uart_rx_enable(const struct device *dev,
  *
  * @param dev     UART device instance.
  * @param buf     Pointer to wide data receive buffer.
- * @param len     Buffer length.
+ * @param len     Positive number of available wide data slots in the buffer.
  * @param timeout Inactivity period after receiving at least a byte which
  *		  triggers  #UART_RX_RDY event. Given in milliseconds.
  *		  @ref SYS_FOREVER_MS disables timeout. See
@@ -1455,7 +1455,7 @@ static inline int z_impl_uart_rx_enable_u16(const struct device *dev,
  *
  * @param dev UART device instance.
  * @param buf Pointer to receive buffer.
- * @param len Buffer length.
+ * @param len Positive number of available data slots in the buffer.
  *
  * @retval 0 If successful.
  * @retval -ENOTSUP If API is not enabled.
@@ -1492,7 +1492,7 @@ static inline int uart_rx_buf_rsp(const struct device *dev, uint8_t *buf,
  *
  * @param dev UART device instance.
  * @param buf Pointer to wide data receive buffer.
- * @param len Buffer length.
+ * @param len Positive number of available wide data slots in the buffer.
  *
  * @retval 0 If successful.
  * @retval -ENOTSUP If API is not enabled
