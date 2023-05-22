@@ -596,24 +596,24 @@ static void uart_stm32_poll_out_visitor(const struct device *dev, void *out, pol
 	irq_unlock(key);
 }
 
-static void uart_stm32_poll_in_u8(const struct uart_stm32_config *config, void *in)
+static void poll_in_u8(const struct uart_stm32_config *config, void *in)
 {
 	*((unsigned char *)in) = (unsigned char)LL_USART_ReceiveData8(config->usart);
 }
 
-static void uart_stm32_poll_out_u8(const struct uart_stm32_config *config, void *out)
+static void poll_out_u8(const struct uart_stm32_config *config, void *out)
 {
 	LL_USART_TransmitData8(config->usart, *((uint8_t *)out));
 }
 
 static int uart_stm32_poll_in(const struct device *dev, unsigned char *c)
 {
-	return uart_stm32_poll_in_visitor(dev, (void *)c, uart_stm32_poll_in_u8);
+	return uart_stm32_poll_in_visitor(dev, (void *)c, poll_in_u8);
 }
 
 static void uart_stm32_poll_out(const struct device *dev, unsigned char c)
 {
-	uart_stm32_poll_out_visitor(dev, (void *)&c, uart_stm32_poll_out_u8);
+	uart_stm32_poll_out_visitor(dev, (void *)&c, poll_out_u8);
 }
 
 static int uart_stm32_err_check(const struct device *dev)
@@ -675,29 +675,6 @@ static int uart_stm32_err_check(const struct device *dev)
 	return err;
 }
 
-#ifdef CONFIG_UART_WIDE_DATA
-
-static void uart_stm32_poll_out_u9(const struct uart_stm32_config *config, void *out)
-{
-	LL_USART_TransmitData9(config->usart, *((uint16_t *)out));
-}
-
-static void uart_stm32_poll_in_u9(const struct uart_stm32_config *config, void *in)
-{
-	*((uint16_t *)in) = LL_USART_ReceiveData9(config->usart);
-}
-
-static int uart_stm32_poll_in_u16(const struct device *dev, uint16_t *p_u16)
-{
-	return uart_stm32_poll_in_visitor(dev, (void *)p_u16, uart_stm32_poll_in_u9);
-}
-
-static void uart_stm32_poll_out_u16(const struct device *dev, uint16_t out_u16)
-{
-	uart_stm32_poll_out_visitor(dev, (void *)&out_u16, uart_stm32_poll_out_u9);
-}
-#endif
-
 static inline void __uart_stm32_get_clock(const struct device *dev)
 {
 	struct uart_stm32_data *data = dev->data;
@@ -738,7 +715,7 @@ static int uart_stm32_fifo_fill_visitor(const struct device *dev, const void *tx
 	return num_tx;
 }
 
-static void uart_stm32_fifo_fill_with_u8(const struct uart_stm32_config *config,
+static void fifo_fill_with_u8(const struct uart_stm32_config *config,
 					 const void *tx_data, const uint8_t offset)
 {
 	const uint8_t *data = (const uint8_t *)tx_data;
@@ -753,7 +730,7 @@ static int uart_stm32_fifo_fill(const struct device *dev, const uint8_t *tx_data
 		return -ENOTSUP;
 	}
 	return uart_stm32_fifo_fill_visitor(dev, (const void *)tx_data, size,
-					    uart_stm32_fifo_fill_with_u8);
+					    fifo_fill_with_u8);
 }
 
 typedef void (*fifo_read_fn)(const struct uart_stm32_config *config, void *rx_data,
@@ -784,7 +761,7 @@ static int uart_stm32_fifo_read_visitor(const struct device *dev, void *rx_data,
 	return num_rx;
 }
 
-static void uart_stm32_fifo_read_with_u8(const struct uart_stm32_config *config, void *rx_data,
+static void fifo_read_with_u8(const struct uart_stm32_config *config, void *rx_data,
 					 const uint8_t offset)
 {
 	uint8_t *data = (uint8_t *)rx_data;
@@ -799,49 +776,8 @@ static int uart_stm32_fifo_read(const struct device *dev, uint8_t *rx_data, cons
 		return -ENOTSUP;
 	}
 	return uart_stm32_fifo_read_visitor(dev, (void *)rx_data, size,
-					    uart_stm32_fifo_read_with_u8);
+					    fifo_read_with_u8);
 }
-
-#ifdef CONFIG_UART_WIDE_DATA
-
-static void uart_stm32_fifo_fill_with_u16(const struct uart_stm32_config *config,
-					  const void *tx_data, const uint8_t offset)
-{
-	const uint16_t *data = (const uint16_t *)tx_data;
-
-	/* Send a character (9bit) */
-	LL_USART_TransmitData9(config->usart, data[offset]);
-}
-
-static int uart_stm32_fifo_fill_u16(const struct device *dev, const uint16_t *tx_data, int size)
-{
-	if (uart_stm32_ll2cfg_databits(uart_stm32_get_databits(dev), uart_stm32_get_parity(dev)) !=
-	    UART_CFG_DATA_BITS_9) {
-		return -ENOTSUP;
-	}
-	return uart_stm32_fifo_fill_visitor(dev, (const void *)tx_data, size,
-					    uart_stm32_fifo_fill_with_u16);
-}
-
-static void uart_stm32_fifo_read_with_u16(const struct uart_stm32_config *config, void *rx_data,
-					  const uint8_t offset)
-{
-	uint16_t *data = (uint16_t *)rx_data;
-
-	data[offset] = LL_USART_ReceiveData9(config->usart);
-}
-
-static int uart_stm32_fifo_read_u16(const struct device *dev, uint16_t *rx_data, const int size)
-{
-	if (uart_stm32_ll2cfg_databits(uart_stm32_get_databits(dev), uart_stm32_get_parity(dev)) !=
-	    UART_CFG_DATA_BITS_9) {
-		return -ENOTSUP;
-	}
-	return uart_stm32_fifo_read_visitor(dev, (void *)rx_data, size,
-					    uart_stm32_fifo_read_with_u16);
-}
-
-#endif
 
 static void uart_stm32_irq_tx_enable(const struct device *dev)
 {
