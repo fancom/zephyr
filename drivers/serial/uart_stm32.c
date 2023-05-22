@@ -292,7 +292,7 @@ static inline uint32_t uart_stm32_cfg2ll_stopbits(const struct uart_stm32_config
 #if HAS_LPUART_1
 		if (IS_LPUART_INSTANCE(config->usart)) {
 			/* return the default */
-			return LL_USART_STOPBITS_2;
+			return LL_USART_STOPBITS_1;
 		}
 #endif /* HAS_LPUART_1 */
 		return LL_USART_STOPBITS_0_5;
@@ -305,7 +305,7 @@ static inline uint32_t uart_stm32_cfg2ll_stopbits(const struct uart_stm32_config
 #if HAS_LPUART_1
 		if (IS_LPUART_INSTANCE(config->usart)) {
 			/* return the default */
-			return LL_USART_STOPBITS_2;
+			return LL_USART_STOPBITS_1;
 		}
 #endif
 		return LL_USART_STOPBITS_1_5;
