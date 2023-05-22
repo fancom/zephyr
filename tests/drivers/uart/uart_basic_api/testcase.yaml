@@ -5,6 +5,14 @@ tests:
     harness: keyboard
     integration_platforms:
       - mps2_an385
+  drivers.uart.basic_api.wide:
+    extra_args:
+      - OVERLAY_CONFIG="overlay-wide.conf"
+    tags: drivers uart
+    filter: CONFIG_UART_CONSOLE and CONFIG_SERIAL_SUPPORT_WIDE_DATA
+    harness: keyboard
+    integration_platforms:
+      - nucleo_h743zi
   drivers.uart.basic_api.poll:
     extra_args: CONF_FILE=prj_poll.conf
     tags: drivers uart
