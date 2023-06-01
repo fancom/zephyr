@@ -11,6 +11,13 @@ properties:
   pinctrl-names:
     required: true
 
+  four-channel-capture-support:
+    type: boolean
+    description: |
+      Add support to capture on four channels. This is less accurate
+      than the default 2 channel support because the counter is reset
+      by interrupt instead of slave-mode controller.
+
   "#pwm-cells":
     const: 3
     description: |
