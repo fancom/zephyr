@@ -846,7 +846,8 @@ static int pwm_stm32_init(const struct device *dev)
 		r = pwm_set(dev, preset->channel, preset->period_ns,
 				   preset->pulse_ns, preset->flags);
 		if (r < 0) {
-			LOG_ERR("PWM timing setup failed (%d)", r);
+			LOG_ERR("PWM timing setup on channel %d failed (%d)",
+				preset->channel, r);
 			return r;
 		}
 	}
@@ -874,6 +875,7 @@ static void pwm_stm32_irq_config_func_##index(const struct device *dev)        \
 #define DEFINE_TIMINGS(index)						\
 	static const uint32_t pwm_channel_timings_##index[] =		\
 		DT_INST_PROP_OR(index, timings, {});
+
 #define USE_TIMINGS(index)								   \
 	.timings = (const struct pwm_config_channel_timing *) pwm_channel_timings_##index, \
 	.n_timings = ARRAY_SIZE(pwm_channel_timings_##index)/TIMING_NR_CELLS,
