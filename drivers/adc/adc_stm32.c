@@ -895,6 +895,9 @@ static int start_read(const struct device *dev,
 	}
 
 	data->buffer = sequence->buffer;
+
+	/* store the buffer address to be used in a repeat */
+	data->repeat_buffer = data->buffer;
 	data->channels = sequence->channels;
 	data->channel_count = POPCOUNT(data->channels);
 	data->samples_count = 0;
@@ -1140,8 +1143,6 @@ static void adc_context_start_sampling(struct adc_context *ctx)
 	struct adc_stm32_data *data =
 		CONTAINER_OF(ctx, struct adc_stm32_data, ctx);
 
-	data->repeat_buffer = data->buffer;
-
 #ifdef CONFIG_ADC_STM32_DMA
 	adc_stm32_dma_start(data->dev, data->buffer, data->channel_count);
 #endif
@@ -1155,6 +1156,7 @@ static void adc_context_update_buffer_pointer(struct adc_context *ctx,
 		CONTAINER_OF(ctx, struct adc_stm32_data, ctx);
 
 	if (repeat_sampling) {
+		/* when repeating, set the original buffer address again */
 		data->buffer = data->repeat_buffer;
 	}
 }
